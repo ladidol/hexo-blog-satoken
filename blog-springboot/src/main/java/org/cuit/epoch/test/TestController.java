@@ -10,13 +10,13 @@ import org.springframework.web.bind.annotation.RestController;
  *
  */
 @RestController
-@RequestMapping("/test/")
+@RequestMapping("/admin1/")
 public class TestController {
 
 	// 测试   浏览器访问： http://localhost:8081/test/test
 	@RequestMapping("test")
-	public SaResult test() {
-		System.out.println("------------进来了"); 
+	public SaResult test(String data) {
+		System.out.println(data+ " ------------进来了");
 		return SaResult.ok();
 	}
 	

@@ -1,13 +1,14 @@
 package org.cuit.epoch.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.cuit.epoch.entity.UserAuth;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
 
-@Repository
+@Mapper
 public interface UserAuthMapper extends BaseMapper<UserAuth> {
 
 //    /**

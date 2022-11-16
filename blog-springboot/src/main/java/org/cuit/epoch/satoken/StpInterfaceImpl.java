@@ -36,7 +36,7 @@ public class StpInterfaceImpl implements StpInterface {
 		// 本list仅做模拟，实际项目中要根据具体业务逻辑来查询角色
 		List<String> list = new ArrayList<String>();	
 		list.add("admin");
-		list.add("super-admin");
+		list.add("test");
 		// TODO: 2022/11/15 给登录的人自然放上数据库中查询到的权限
 
 

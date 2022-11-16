@@ -30,8 +30,8 @@ public class UserAuthServiceImpl extends ServiceImpl<UserAuthMapper, UserAuth> i
 
 //    @Autowired
 //    private RedisService redisService;
-//    @Autowired
-//    private UserAuthDao userAuthDao;
+    @Autowired
+    private UserAuthMapper userAuthMapper;
 //    @Autowired
 //    private UserRoleDao userRoleDao;
 //    @Autowired
