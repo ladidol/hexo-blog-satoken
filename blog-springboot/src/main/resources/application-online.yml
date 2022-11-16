@@ -25,11 +25,11 @@ spring:
     # Redis数据库索引（默认为0）
     database: 0
     # Redis服务器地址
-    host: 47.108.188.92
+    host:
     # Redis服务器连接端口
-    port: 6999
+    port:
     # Redis服务器连接密码（默认为空）
-    password: nihao123
+    password:
     # 连接超时时间
     timeout: 10s
     lettuce:
@@ -46,9 +46,9 @@ spring:
     type: com.zaxxer.hikari.HikariDataSource
     driver-class-name: com.mysql.cj.jdbc.Driver
     #    url: jdbc:mysql://localhost:3306/cloud_disk?useSSL=false&useUnicode=true&characterEncoding=utf-8&serverTimezone=GMT%2B8&allowPublicKeyRetrieval=true
-    url: jdbc:mysql://47.108.188.92:4406/new_blog?serverTimezone=Asia/Shanghai&allowMultiQueries=true
-    username: root
-    password: nihao123
+    url: jdbc:mysql:///new_blog?serverTimezone=Asia/Shanghai&allowMultiQueries=true
+    username:
+    password:
     druid:
       initialSize: 10   #初始化连接个数
       minIdle: 10       #最小空闲连接个数
