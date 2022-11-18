@@ -1,24 +1,56 @@
 package org.cuit.epoch.service.impl;
 
+import cn.dev33.satoken.stp.StpUtil;
+import com.alibaba.fastjson.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.baomidou.mybatisplus.core.toolkit.StringUtils;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import eu.bitwalker.useragentutils.UserAgent;
+import lombok.extern.slf4j.Slf4j;
+import org.cuit.epoch.dto.EmailDTO;
+import org.cuit.epoch.dto.UserDetailDTO;
 import org.cuit.epoch.entity.UserAuth;
+import org.cuit.epoch.entity.UserInfo;
+import org.cuit.epoch.entity.UserRole;
+import org.cuit.epoch.enums.CommonConst;
+
+import org.cuit.epoch.enums.LoginTypeEnum;
+import org.cuit.epoch.enums.RoleEnum;
+import org.cuit.epoch.exception.AppException;
+import org.cuit.epoch.mapper.RoleMapper;
 import org.cuit.epoch.mapper.UserAuthMapper;
 
+import org.cuit.epoch.mapper.UserInfoMapper;
+import org.cuit.epoch.mapper.UserRoleMapper;
+import org.cuit.epoch.service.BlogInfoService;
+import org.cuit.epoch.service.RedisService;
 import org.cuit.epoch.service.UserAuthService;
+import org.cuit.epoch.util.IpUtils;
+import org.cuit.epoch.util.PasswordUtils;
+import org.cuit.epoch.vo.UserVO;
+import org.springframework.amqp.core.Message;
+import org.springframework.amqp.core.MessageProperties;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import javax.servlet.http.HttpServletRequest;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.*;
 import java.util.stream.Collectors;
+
+import static org.cuit.epoch.enums.MQPrefixConst.EMAIL_EXCHANGE;
+import static org.cuit.epoch.enums.RedisPrefixConst.*;
+import static org.cuit.epoch.enums.RedisPrefixConst.TALK_USER_LIKE;
+import static org.cuit.epoch.enums.ZoneEnum.SHANGHAI;
+import static org.cuit.epoch.util.CommonUtils.checkEmail;
+import static org.cuit.epoch.util.CommonUtils.getRandomCode;
 
 /**
  * @author: ladidol
@@ -26,64 +58,189 @@ import java.util.stream.Collectors;
  * @description:
  */
 @Service
+@Slf4j
 public class UserAuthServiceImpl extends ServiceImpl<UserAuthMapper, UserAuth> implements UserAuthService {
 
-//    @Autowired
-//    private RedisService redisService;
+    @Autowired
+    private RedisService redisService;
     @Autowired
     private UserAuthMapper userAuthMapper;
-//    @Autowired
-//    private UserRoleDao userRoleDao;
-//    @Autowired
-//    private UserInfoDao userInfoDao;
-//    @Autowired
-//    private BlogInfoService blogInfoService;
-//    @Autowired
-//    private RabbitTemplate rabbitTemplate;
+
+    @Autowired
+    private HttpServletRequest request;
+
+    @Autowired
+    private RoleMapper roleMapper;
+
+    @Autowired
+    private UserRoleMapper userRoleMapper;
+    @Autowired
+    private UserInfoMapper userInfoMapper;
+    @Autowired
+    private BlogInfoService blogInfoService;
+    @Autowired
+    private RabbitTemplate rabbitTemplate;
 //    @Autowired
 //    private SocialLoginStrategyContext socialLoginStrategyContext;
 
 
-
-
-
-
     @Override
-    public void login() {
+    public UserDetailDTO login(String username, String password) {
+        if (StringUtils.isBlank(username)) {
+            throw new AppException("用户名不能为空！");
+        }
+        // 查询账号是否存在
+        UserAuth userAuth = userAuthMapper.selectOne(new LambdaQueryWrapper<UserAuth>()
+                .select(UserAuth::getId, UserAuth::getUserInfoId, UserAuth::getUsername, UserAuth::getPassword, UserAuth::getLoginType)
+                .eq(UserAuth::getUsername, username));
+        if (Objects.isNull(userAuth)) {
+            throw new AppException("用户名不存在!");
+        }
+        // 封装登录信息
+        UserDetailDTO userDetailDTO = convertUserDetail(userAuth, request);
+        log.info("userDetailDTO = " + userDetailDTO);
 
-        // TODO: 2022/11/15 看一下是怎么查询的用户权限，这里就可以吧权限赋值到session中去
+        if (!userDetailDTO.getPassword().equals(PasswordUtils.encrypt(password))) {
+            throw new AppException("密码错误！");
+        }
+        //sa-token登录
+        StpUtil.login(userDetailDTO.getId());
+        //用户redis角色添加
+        redisService.set(USER_ROLE + StpUtil.getLoginId(), userDetailDTO.getRoleList());
+        // 更新用户ip，最近登录时间
+        updateUserInfo(userDetailDTO);
 
+        return userDetailDTO;
+    }
 
+    /**
+     * 封装用户登录信息
+     *
+     * @param user    用户账号
+     * @param request 请求
+     * @return 用户登录信息
+     */
+    public UserDetailDTO convertUserDetail(UserAuth user, HttpServletRequest request) {
+        // 查询账号信息
+        UserInfo userInfo = userInfoMapper.selectById(user.getUserInfoId());
+        // 查询账号角色
+        List<String> roleList = roleMapper.listRolesByUserInfoId(userInfo.getId());
+        // 查询账号点赞信息
+        Set<Object> articleLikeSet = redisService.sMembers(ARTICLE_USER_LIKE + userInfo.getId());
+        Set<Object> commentLikeSet = redisService.sMembers(COMMENT_USER_LIKE + userInfo.getId());
+        Set<Object> talkLikeSet = redisService.sMembers(TALK_USER_LIKE + userInfo.getId());
+        // 获取设备信息
+        String ipAddress = IpUtils.getIpAddress(request);
+        String ipSource = IpUtils.getIpSource(ipAddress);
+        UserAgent userAgent = IpUtils.getUserAgent(request);
+        // 封装权限集合
+        return UserDetailDTO.builder()
+                .id(user.getId())
+                .loginType(user.getLoginType())
+                .userInfoId(userInfo.getId())
+                .username(user.getUsername())
+                .password(user.getPassword())
+                .email(userInfo.getEmail())
+                .roleList(roleList)
+                .nickname(userInfo.getNickname())
+                .avatar(userInfo.getAvatar())
+                .intro(userInfo.getIntro())
+                .webSite(userInfo.getWebSite())
+                .articleLikeSet(articleLikeSet)
+                .commentLikeSet(commentLikeSet)
+                .talkLikeSet(talkLikeSet)
+                .ipAddress(ipAddress)
+                .ipSource(ipSource)
+                .isDisable(userInfo.getIsDisable())
+                .browser(userAgent.getBrowser().getName())
+                .os(userAgent.getOperatingSystem().getName())
+                .lastLoginTime(LocalDateTime.now(ZoneId.of(SHANGHAI.getZone())))
+                .build();
+    }
+
+    /**
+     * 登录成功后 更新用户信息
+     */
+    @Async
+    public void updateUserInfo(UserDetailDTO userDetailDTO) {
+        UserAuth userAuth = UserAuth.builder()
+                .id(userDetailDTO.getId())
+                .ipAddress(userDetailDTO.getIpAddress())
+                .ipSource(userDetailDTO.getIpSource())
+                .lastLoginTime(userDetailDTO.getLastLoginTime())
+                .build();
+        userAuthMapper.updateById(userAuth);
     }
 
 
+    @Transactional(rollbackFor = Exception.class)
+    @Override
+    public void register(UserVO user) {
+        // 校验账号是否合法
+        if (checkUser(user)) {
+            throw new AppException("邮箱已被注册！");
+        }
+        // 新增用户信息
+        UserInfo userInfo = UserInfo.builder()
+                .email(user.getUsername())
+                .nickname(CommonConst.DEFAULT_NICKNAME + IdWorker.getId())
+                .avatar(blogInfoService.getWebsiteConfig().getUserAvatar())
+                .build();
+        userInfoMapper.insert(userInfo);
+        // 绑定用户角色
+        UserRole userRole = UserRole.builder()
+                .userId(userInfo.getId())
+                .roleId(RoleEnum.USER.getRoleId())
+                .build();
+        userRoleMapper.insert(userRole);
+        // 新增用户账号
+        UserAuth userAuth = UserAuth.builder()
+                .userInfoId(userInfo.getId())
+                .username(user.getUsername())
+                .password(PasswordUtils.encrypt(user.getPassword()))
+                .loginType(LoginTypeEnum.EMAIL.getType())
+                .build();
+        userAuthMapper.insert(userAuth);
+    }
 
-
-
-
-
-
-
-
-
-//    @Override
-//    public void sendCode(String username) {
-//        // 校验账号是否合法
-//        if (!checkEmail(username)) {
-//            throw new BizException("请输入正确邮箱");
+    /**
+     * 校验用户数据是否合法
+     *
+     * @param user 用户数据
+     * @return 结果
+     */
+    private Boolean checkUser(UserVO user) {
+//        if (!user.getCode().equals(redisService.get(USER_CODE_KEY + user.getUsername()))) {
+//            throw new AppException("验证码错误！");
 //        }
-//        // 生成六位随机验证码发送
-//        String code = getRandomCode();
-//        // 发送验证码
-//        EmailDTO emailDTO = EmailDTO.builder()
-//                .email(username)
-//                .subject("验证码")
-//                .content("您的验证码为 " + code + " 有效期15分钟，请不要告诉他人哦！")
-//                .build();
-//        rabbitTemplate.convertAndSend(EMAIL_EXCHANGE, "*", new Message(JSON.toJSONBytes(emailDTO), new MessageProperties()));
-//        // 将验证码存入redis，设置过期时间为15分钟
-//        redisService.set(USER_CODE_KEY + username, code, CODE_EXPIRE_TIME);
-//    }
+        // TODO: 2022/11/18 开发期间先将邮箱验证关闭
+
+        //查询用户名是否存在
+        UserAuth userAuth = userAuthMapper.selectOne(new LambdaQueryWrapper<UserAuth>()
+                .select(UserAuth::getUsername)
+                .eq(UserAuth::getUsername, user.getUsername()));
+        return Objects.nonNull(userAuth);
+    }
+
+
+    @Override
+    public void sendCode(String username) {
+        // 校验账号是否合法
+        if (!checkEmail(username)) {
+            throw new AppException("请输入正确邮箱");
+        }
+        // 生成六位随机验证码发送
+        String code = getRandomCode();
+        // 发送验证码
+        EmailDTO emailDTO = EmailDTO.builder()
+                .email(username)
+                .subject("验证码")
+                .content("您的验证码为 " + code + " 有效期15分钟，请不要告诉他人哦！")
+                .build();
+        rabbitTemplate.convertAndSend(EMAIL_EXCHANGE, "*", new Message(JSON.toJSONBytes(emailDTO), new MessageProperties()));
+        // 将验证码存入redis，设置过期时间为15分钟
+        redisService.set(USER_CODE_KEY + username, code, CODE_EXPIRE_TIME);
+    }
 //
 //    @Override
 //    public List<UserAreaDTO> listUserAreas(ConditionVO conditionVO) {
@@ -113,36 +270,7 @@ public class UserAuthServiceImpl extends ServiceImpl<UserAuthMapper, UserAuth> i
 //        }
 //        return userAreaDTOList;
 //    }
-//
-//    @Transactional(rollbackFor = Exception.class)
-//    @Override
-//    public void register(UserVO user) {
-//        // 校验账号是否合法
-//        if (checkUser(user)) {
-//            throw new BizException("邮箱已被注册！");
-//        }
-//        // 新增用户信息
-//        UserInfo userInfo = UserInfo.builder()
-//                .email(user.getUsername())
-//                .nickname(CommonConst.DEFAULT_NICKNAME + IdWorker.getId())
-//                .avatar(blogInfoService.getWebsiteConfig().getUserAvatar())
-//                .build();
-//        userInfoDao.insert(userInfo);
-//        // 绑定用户角色
-//        UserRole userRole = UserRole.builder()
-//                .userId(userInfo.getId())
-//                .roleId(RoleEnum.USER.getRoleId())
-//                .build();
-//        userRoleDao.insert(userRole);
-//        // 新增用户账号
-//        UserAuth userAuth = UserAuth.builder()
-//                .userInfoId(userInfo.getId())
-//                .username(user.getUsername())
-//                .password(BCrypt.hashpw(user.getPassword(), BCrypt.gensalt()))
-//                .loginType(LoginTypeEnum.EMAIL.getType())
-//                .build();
-//        userAuthDao.insert(userAuth);
-//    }
+
 //
 //    @Override
 //    public void updatePassword(UserVO user) {

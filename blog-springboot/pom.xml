@@ -35,6 +35,12 @@
             <scope>test</scope>
         </dependency>
 
+        <!--Spring Boot 集成的 rabbit-->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-amqp</artifactId>
+        </dependency>
+
         <!--redis-->
         <dependency>
             <groupId>org.springframework.boot</groupId>
