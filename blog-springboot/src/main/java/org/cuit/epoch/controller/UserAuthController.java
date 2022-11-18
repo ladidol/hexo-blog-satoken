@@ -3,10 +3,14 @@ package org.cuit.epoch.controller;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiImplicitParam;
 import io.swagger.annotations.ApiOperation;
+import org.cuit.epoch.annotation.AccessLimit;
 import org.cuit.epoch.service.UserAuthService;
+import org.cuit.epoch.util.Result;
+import org.cuit.epoch.vo.UserVO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import javax.validation.Valid;
 import java.util.List;
 
 /**
@@ -20,20 +24,20 @@ public class UserAuthController {
     @Autowired
     private UserAuthService userAuthService;
 
-//    /**
-//     * 发送邮箱验证码
-//     *
-//     * @param username 用户名
-//     * @return {@link Result<>}
-//     */
-//    @AccessLimit(seconds = 60, maxCount = 1)
-//    @ApiOperation(value = "发送邮箱验证码")
-//    @ApiImplicitParam(name = "username", value = "用户名", required = true, dataType = "String")
-//    @GetMapping("/users/code")
-//    public Result<?> sendCode(String username) {
-//        userAuthService.sendCode(username);
-//        return Result.ok();
-//    }
+    /**
+     * 发送邮箱验证码
+     *
+     * @param username 用户名
+     * @return {@link Result<>}
+     */
+    @AccessLimit(seconds = 60, maxCount = 1)
+    @ApiOperation(value = "发送邮箱验证码")
+    @ApiImplicitParam(name = "username", value = "用户名", required = true, dataType = "String")
+    @GetMapping("/users/code")
+    public Result<?> sendCode(String username) {
+        userAuthService.sendCode(username);
+        return Result.ok();
+    }
 //
 //    /**
 //     * 获取用户区域分布
@@ -58,20 +62,20 @@ public class UserAuthController {
 //    public Result<PageResult<UserBackDTO>> listUsers(ConditionVO condition) {
 //        return Result.ok(userAuthService.listUserBackDTO(condition));
 //    }
-//
-//    /**
-//     * 用户注册
-//     *
-//     * @param user 用户信息
-//     * @return {@link Result<>}
-//     */
-//    @ApiOperation(value = "用户注册")
-//    @PostMapping("/register")
-//    public Result<?> register(@Valid @RequestBody UserVO user) {
-//        userAuthService.register(user);
-//        return Result.ok();
-//    }
-//
+
+    /**
+     * 用户注册
+     *
+     * @param user 用户信息
+     * @return {@link Result<>}
+     */
+    @ApiOperation(value = "用户注册")
+    @PostMapping("/register")
+    public Result<?> register(@Valid @RequestBody UserVO user) {
+        userAuthService.register(user);
+        return Result.ok();
+    }
+
 //    /**
 //     * 修改密码
 //     *

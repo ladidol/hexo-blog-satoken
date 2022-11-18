@@ -1,7 +1,9 @@
 package org.cuit.epoch.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
+import org.cuit.epoch.dto.UserDetailDTO;
 import org.cuit.epoch.entity.UserAuth;
+import org.cuit.epoch.vo.UserVO;
 
 import java.util.List;
 
@@ -19,17 +21,17 @@ public interface UserAuthService extends IService<UserAuth> {
      * 作者： ladidol
      * 描述：登录接口
      */
-    void login();
+    UserDetailDTO login(String username, String password);
 
 
 
 
-//    /**
-//     * 发送邮箱验证码
-//     *
-//     * @param username 邮箱号
-//     */
-//    void sendCode(String username);
+    /**
+     * 发送邮箱验证码
+     *
+     * @param username 邮箱号
+     */
+    void sendCode(String username);
 //
 //    /**
 //     * 获取用户区域分布
@@ -38,14 +40,14 @@ public interface UserAuthService extends IService<UserAuth> {
 //     * @return {@link List <UserAreaDTO>} 用户区域分布
 //     */
 //    List<UserAreaDTO> listUserAreas(ConditionVO conditionVO);
-//
-//    /**
-//     * 用户注册
-//     *
-//     * @param user 用户对象
-//     */
-//    void register(UserVO user);
-//
+
+    /**
+     * 用户注册
+     *
+     * @param user 用户对象
+     */
+    void register(UserVO user);
+
 //    /**
 //     * qq登录
 //     *
