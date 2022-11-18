@@ -42,6 +42,33 @@ spring:
         max-idle: 10
         # 连接池中的最小空闲连接
         min-idle: 0
+  # mq配置
+  rabbitmq:
+    host: 47.108.188.92
+    port: 5672
+    username: guest
+    password: guest
+    listener:
+      simple:
+        retry:
+          enabled: true
+          max-attempts: 3 #最大重试次数
+          initial-interval: 3000 #重试间隔时间（单位毫秒）
+  # 邮箱配置
+  mail:
+    host: smtp.qq.com
+    username: 599426945@qq.com
+    password: caaqaufvituhbcii
+    default-encoding: UTF-8
+    port: 587
+    properties:
+      mail:
+      smtp:
+      auth: true
+      socketFactory:
+      class: javax.net.ssl.SSLSocketFactory
+
+
   datasource:
     type: com.zaxxer.hikari.HikariDataSource
     driver-class-name: com.mysql.cj.jdbc.Driver

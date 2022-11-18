@@ -35,10 +35,16 @@
             <scope>test</scope>
         </dependency>
 
+        <!--=====================================一些其他中间件等 依赖部分==================================-->
         <!--Spring Boot 集成的 rabbit-->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-amqp</artifactId>
+        </dependency>
+        <!--mail-->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
         </dependency>
 
         <!--redis-->
@@ -58,6 +64,9 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-elasticsearch</artifactId>
         </dependency>
+
+
+        <!--=====================================一些工具等 依赖部分==================================-->
         <dependency>
             <groupId>mysql</groupId>
             <artifactId>mysql-connector-java</artifactId>
