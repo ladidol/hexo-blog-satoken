@@ -51,7 +51,7 @@ public class SaTokenConfigure implements WebMvcConfigurer {
             // 角色校验 -- 拦截以 admin 开头的路由，必须具备 admin 角色或者 super-admin 角色才可以通过认证
 //            SaRouter.match("/admin/**", r -> StpUtil.checkRoleOr("admin", "test"));
             // 甚至你可以随意的写一个打印语句
-            SaRouter.match("/**", r -> log.info("----啦啦啦跑了一个匿名接口了----路径为：", request.getPathInfo()));
+            SaRouter.match("/**", r -> log.info("----啦啦啦跑了一个匿名接口了----路径为：" + request.getRequestURI()));
 
 //			// 连缀写法
 //			SaRouter.match("/**").check(r -> System.out.println("----啦啦啦----"));
@@ -71,12 +71,13 @@ public class SaTokenConfigure implements WebMvcConfigurer {
                 .addInclude("/admin/**")
                 .addExclude("/favicon.ico")
                 .addExclude("/login")
+                .addExclude("/doc.html")
 
                 // 认证函数: 每次请求执行
                 .setAuth(mySourceSafilterAuthStrategy)
                 // 异常处理函数：每次认证函数发生异常时执行此函数
                 .setError(e -> {
-                    // TODO: 2022/11/18 这里就是用户权限不足的时候
+                    // 2022/11/18 这里就是用户权限不足的时候
                     log.info(e.getMessage());
                     return SaResult.error(e.getMessage());
                 })

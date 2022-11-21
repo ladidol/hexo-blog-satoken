@@ -1,0 +1,162 @@
+package org.cuit.epoch.service.impl;
+
+import cn.dev33.satoken.stp.StpUtil;
+import com.alibaba.fastjson.JSON;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.toolkit.StringUtils;
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import lombok.extern.slf4j.Slf4j;
+import org.cuit.epoch.dto.UserDetailDTO;
+import org.cuit.epoch.entity.UserInfo;
+import org.cuit.epoch.enums.FilePathEnum;
+import org.cuit.epoch.exception.AppException;
+import org.cuit.epoch.mapper.UserInfoMapper;
+import org.cuit.epoch.service.RedisService;
+import org.cuit.epoch.service.UserInfoService;
+import org.cuit.epoch.strategy.context.UploadStrategyContext;
+import org.cuit.epoch.vo.EmailVO;
+import org.cuit.epoch.vo.UserInfoVO;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.stream.Collectors;
+
+import static org.cuit.epoch.enums.RedisPrefixConst.*;
+
+/**
+ * @author: ladidol
+ * @date: 2022/11/20 21:31
+ * @description:
+ */
+@Service
+@Slf4j
+public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> implements UserInfoService {
+    @Autowired
+    private UserInfoMapper userInfoDao;
+    //    @Autowired
+//    private UserRoleService userRoleService;
+//    @Autowired
+//    private SessionRegistry sessionRegistry;
+    @Autowired
+    private RedisService redisService;
+    @Autowired
+    private UploadStrategyContext uploadStrategyContext;
+
+
+    @Transactional(rollbackFor = Exception.class)
+    @Override
+    public void updateUserInfo(UserInfoVO userInfoVO) {
+        log.info("loginId = " + StpUtil.getLoginId() + " 更改用户信息");
+        // 2022/11/21 值得注意的是，需要存入redis中的序列化对象需要有构造函数。
+        UserDetailDTO userDetailDTO = (UserDetailDTO) redisService.get(USER_INFO + StpUtil.getLoginId());
+
+        // 封装用户信息
+        UserInfo userInfo = UserInfo.builder()
+                .id(userDetailDTO.getUserInfoId())
+                .nickname(userInfoVO.getNickname())
+                .intro(userInfoVO.getIntro())
+                .webSite(userInfoVO.getWebSite())
+                .build();
+        userInfoDao.updateById(userInfo);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    @Override
+    public String updateUserAvatar(MultipartFile file) {
+        log.info("loginId = " + StpUtil.getLoginId() + " 更改用户头像");
+        // 头像上传
+        String avatar = uploadStrategyContext.executeUploadStrategy(file, FilePathEnum.AVATAR.getPath());
+        UserDetailDTO userDetailDTO = (UserDetailDTO) redisService.get(USER_INFO + StpUtil.getLoginId());
+        // 更新用户信息
+        UserInfo userInfo = UserInfo.builder()
+                .id(userDetailDTO.getUserInfoId())
+                .avatar(avatar)
+                .build();
+        userInfoDao.updateById(userInfo);
+        return avatar;
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    @Override
+    public void saveUserEmail(EmailVO emailVO) {
+        log.info("loginId = " + StpUtil.getLoginId() + " 更改用户邮箱");
+        UserDetailDTO userDetailDTO = (UserDetailDTO) redisService.get(USER_INFO + StpUtil.getLoginId());
+        //依旧需要进行邮箱验证
+        if (!emailVO.getCode().equals(redisService.get(USER_CODE_KEY + emailVO.getEmail()).toString())) {
+            throw new AppException("验证码错误！");
+        }
+        UserInfo userInfo = UserInfo.builder()
+                .id(userDetailDTO.getUserInfoId())
+                .email(emailVO.getEmail())
+                .build();
+        userInfoDao.updateById(userInfo);
+    }
+
+//    @Transactional(rollbackFor = Exception.class)
+//    @Override
+//    public void updateUserRole(UserRoleVO userRoleVO) {
+//        // 更新用户角色和昵称
+//        UserInfo userInfo = UserInfo.builder()
+//                .id(userRoleVO.getUserInfoId())
+//                .nickname(userRoleVO.getNickname())
+//                .build();
+//        userInfoDao.updateById(userInfo);
+//        // 删除用户角色重新添加
+//        userRoleService.remove(new LambdaQueryWrapper<UserRole>()
+//                .eq(UserRole::getUserId, userRoleVO.getUserInfoId()));
+//        List<UserRole> userRoleList = userRoleVO.getRoleIdList().stream()
+//                .map(roleId -> UserRole.builder()
+//                        .roleId(roleId)
+//                        .userId(userRoleVO.getUserInfoId())
+//                        .build())
+//                .collect(Collectors.toList());
+//        userRoleService.saveBatch(userRoleList);
+//    }
+//
+//    @Transactional(rollbackFor = Exception.class)
+//    @Override
+//    public void updateUserDisable(UserDisableVO userDisableVO) {
+//        // 更新用户禁用状态
+//        UserInfo userInfo = UserInfo.builder()
+//                .id(userDisableVO.getId())
+//                .isDisable(userDisableVO.getIsDisable())
+//                .build();
+//        userInfoDao.updateById(userInfo);
+//    }
+//
+//    @Override
+//    public PageResult<UserOnlineDTO> listOnlineUsers(ConditionVO conditionVO) {
+//        // 获取security在线session
+//        List<UserOnlineDTO> userOnlineDTOList = sessionRegistry.getAllPrincipals().stream()
+//                .filter(item -> sessionRegistry.getAllSessions(item, false).size() > 0)
+//                .map(item -> JSON.parseObject(JSON.toJSONString(item), UserOnlineDTO.class))
+//                .filter(item -> StringUtils.isBlank(conditionVO.getKeywords()) || item.getNickname().contains(conditionVO.getKeywords()))
+//                .sorted(Comparator.comparing(UserOnlineDTO::getLastLoginTime).reversed())
+//                .collect(Collectors.toList());
+//        // 执行分页
+//        int fromIndex = getLimitCurrent().intValue();
+//        int size = getSize().intValue();
+//        int toIndex = userOnlineDTOList.size() - fromIndex > size ? fromIndex + size : userOnlineDTOList.size();
+//        List<UserOnlineDTO> userOnlineList = userOnlineDTOList.subList(fromIndex, toIndex);
+//        return new PageResult<>(userOnlineList, userOnlineDTOList.size());
+//    }
+//
+//    @Override
+//    public void removeOnlineUser(Integer userInfoId) {
+//        // 获取用户session
+//        List<Object> userInfoList = sessionRegistry.getAllPrincipals().stream().filter(item -> {
+//            UserDetailDTO userDetailDTO = (UserDetailDTO) item;
+//            return userDetailDTO.getUserInfoId().equals(userInfoId);
+//        }).collect(Collectors.toList());
+//        List<SessionInformation> allSessions = new ArrayList<>();
+//        userInfoList.forEach(item -> allSessions.addAll(sessionRegistry.getAllSessions(item, false)));
+//        // 注销session
+//        allSessions.forEach(SessionInformation::expireNow);
+//    }
+
+}

@@ -1,8 +1,15 @@
 package org.cuit.epoch.dto;
 
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.datatype.jsr310.deser.LocalDateTimeDeserializer;
+import com.fasterxml.jackson.datatype.jsr310.ser.LocalDateTimeSerializer;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
+import java.io.Serializable;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
@@ -16,7 +23,9 @@ import java.util.stream.Collectors;
  */
 @Data
 @Builder
-public class UserDetailDTO{
+@AllArgsConstructor
+@NoArgsConstructor
+public class UserDetailDTO implements Serializable {
 
     /**
      * 用户账号id
@@ -116,6 +125,8 @@ public class UserDetailDTO{
     /**
      * 最近登录时间
      */
+    @JsonDeserialize(using = LocalDateTimeDeserializer.class)
+    @JsonSerialize(using = LocalDateTimeSerializer.class)
     private LocalDateTime lastLoginTime;
 
 

@@ -83,7 +83,7 @@ public class UserAuthServiceImpl extends ServiceImpl<UserAuthMapper, UserAuth> i
 //    @Autowired
 //    private SocialLoginStrategyContext socialLoginStrategyContext;
 
-
+    @Transactional(rollbackFor = Exception.class)
     @Override
     public UserDetailDTO login(String username, String password) {
         if (StringUtils.isBlank(username)) {
@@ -107,10 +107,27 @@ public class UserAuthServiceImpl extends ServiceImpl<UserAuthMapper, UserAuth> i
         StpUtil.login(userDetailDTO.getId());
         //用户redis角色添加
         redisService.set(USER_ROLE + StpUtil.getLoginId(), userDetailDTO.getRoleList());
+        //用户redis信息添加
+        redisService.set(USER_INFO + StpUtil.getLoginId(),userDetailDTO);
+
+
         // 更新用户ip，最近登录时间
         updateUserInfo(userDetailDTO);
 
         return userDetailDTO;
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    @Override
+    public void logout() {
+
+        //删除用户redis中角色信息
+        redisService.del(USER_ROLE + StpUtil.getLoginId());
+        //删除用户redis中详细信息
+        redisService.del(USER_INFO + StpUtil.getLoginId());
+        //sa-token注销
+        StpUtil.logout();
+
     }
 
     /**
@@ -171,6 +188,15 @@ public class UserAuthServiceImpl extends ServiceImpl<UserAuthMapper, UserAuth> i
                 .build();
         userAuthMapper.updateById(userAuth);
     }
+
+
+
+
+
+
+
+
+
 
 
     @Transactional(rollbackFor = Exception.class)

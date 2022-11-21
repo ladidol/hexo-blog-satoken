@@ -67,7 +67,11 @@ spring:
       auth: true
       socketFactory:
       class: javax.net.ssl.SSLSocketFactory
-
+  # 上传图片大小限制
+  servlet:
+    multipart:
+      max-file-size: 100MB
+      max-request-size:  100MB
 
   datasource:
     type: com.zaxxer.hikari.HikariDataSource
@@ -100,3 +104,23 @@ mybatis-plus:
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
     map-underscore-to-camel-case: true
 
+# 上传模式 可选 oss或local  （http://和最后的/一定不能去！！！）
+upload:
+  mode: oss
+  local:
+    # nginx映射本地文件路径，无域名则为 ip:83
+    url: http://localhost:8888/
+    # 本地文件存储路径
+    path: /usr/local/upload/
+  oss:
+    url: http://dev-myblog.oss-cn-hangzhou.aliyuncs.com/
+    endpoint: oss-cn-hangzhou.aliyuncs.com
+    accessKeyId: LTAI5t71LQhtDpPX79QZ2W4Z
+    accessKeySecret: vrhwczBFcryFJg6SuIleBOSUIWKqO3
+    bucketName: dev-myblog
+  cos:
+    url: http://Bucket域名/
+    secretId: cos的secretId
+    secretKey: cos的secretKey
+    region: cos的region
+    bucketName: cos的bucketName

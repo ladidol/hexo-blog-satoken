@@ -22,6 +22,7 @@ import org.cuit.epoch.util.IpUtils;
 import org.cuit.epoch.util.PasswordUtils;
 import org.cuit.epoch.util.Result;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -58,8 +59,16 @@ public class LoginController {
     @PostMapping("login")
     @ApiOperation(value = "账号密码登录")
     public Result<UserDetailDTO> login(String username, String password) {
-//    public SaResult login(String username, String password, HttpServletRequest request) {//不知道这里的request能不能用
         UserDetailDTO userDetailDTO = userAuthService.login(username, password);
         return Result.ok(userDetailDTO);
     }
+
+    @GetMapping("logout")
+    @ApiOperation(value = "注销登录")
+    public Result<String> logout() {
+        userAuthService.logout();
+        return Result.ok("注销成功");
+    }
+
+
 }

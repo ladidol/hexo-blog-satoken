@@ -26,6 +26,10 @@ public interface UserAuthService extends IService<UserAuth> {
 
 
 
+    void logout();
+
+
+
     /**
      * 发送邮箱验证码
      *
