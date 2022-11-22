@@ -3,7 +3,6 @@ package org.cuit.epoch.service.impl;
 import cn.dev33.satoken.stp.StpUtil;
 import com.alibaba.fastjson.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.baomidou.mybatisplus.core.toolkit.StringUtils;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -11,6 +10,7 @@ import eu.bitwalker.useragentutils.UserAgent;
 import lombok.extern.slf4j.Slf4j;
 import org.cuit.epoch.dto.EmailDTO;
 import org.cuit.epoch.dto.UserDetailDTO;
+import org.cuit.epoch.dto.UserInfoDTO;
 import org.cuit.epoch.entity.UserAuth;
 import org.cuit.epoch.entity.UserInfo;
 import org.cuit.epoch.entity.UserRole;
@@ -27,15 +27,16 @@ import org.cuit.epoch.mapper.UserRoleMapper;
 import org.cuit.epoch.service.BlogInfoService;
 import org.cuit.epoch.service.RedisService;
 import org.cuit.epoch.service.UserAuthService;
+import org.cuit.epoch.strategy.context.SocialLoginStrategyContext;
 import org.cuit.epoch.util.IpUtils;
 import org.cuit.epoch.util.PasswordUtils;
 import org.cuit.epoch.vo.UserVO;
+import org.cuit.epoch.vo.WeiboLoginVO;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageProperties;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Async;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -43,7 +44,6 @@ import javax.servlet.http.HttpServletRequest;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.*;
-import java.util.stream.Collectors;
 
 import static org.cuit.epoch.enums.MQPrefixConst.EMAIL_EXCHANGE;
 import static org.cuit.epoch.enums.RedisPrefixConst.*;
@@ -80,8 +80,8 @@ public class UserAuthServiceImpl extends ServiceImpl<UserAuthMapper, UserAuth> i
     private BlogInfoService blogInfoService;
     @Autowired
     private RabbitTemplate rabbitTemplate;
-//    @Autowired
-//    private SocialLoginStrategyContext socialLoginStrategyContext;
+    @Autowired
+    private SocialLoginStrategyContext socialLoginStrategyContext;
 
     @Transactional(rollbackFor = Exception.class)
     @Override
@@ -105,10 +105,15 @@ public class UserAuthServiceImpl extends ServiceImpl<UserAuthMapper, UserAuth> i
         }
         //sa-token登录
         StpUtil.login(userDetailDTO.getId());
-        //用户redis角色添加
-        redisService.set(USER_ROLE + StpUtil.getLoginId(), userDetailDTO.getRoleList());
-        //用户redis信息添加
-        redisService.set(USER_INFO + StpUtil.getLoginId(),userDetailDTO);
+        //将用户角色信息存入session中
+        StpUtil.getSession().set(USER_ROLE,userDetailDTO.getRoleList());
+        //将用户详细信息存入session中
+        StpUtil.getSession().set(USER_INFO,userDetailDTO);
+
+//        //用户redis角色添加
+//        redisService.set(USER_ROLE + StpUtil.getLoginId(), userDetailDTO.getRoleList());
+//        //用户redis信息添加
+//        redisService.set(USER_INFO + StpUtil.getLoginId(),userDetailDTO);
 
 
         // 更新用户ip，最近登录时间
@@ -121,10 +126,11 @@ public class UserAuthServiceImpl extends ServiceImpl<UserAuthMapper, UserAuth> i
     @Override
     public void logout() {
 
-        //删除用户redis中角色信息
-        redisService.del(USER_ROLE + StpUtil.getLoginId());
-        //删除用户redis中详细信息
-        redisService.del(USER_INFO + StpUtil.getLoginId());
+        // 2022/11/22 这里就不需要用redis来存用户信息了
+//        //删除用户redis中角色信息
+//        redisService.del(USER_ROLE + StpUtil.getLoginId());
+//        //删除用户redis中详细信息
+//        redisService.del(USER_INFO + StpUtil.getLoginId());
         //sa-token注销
         StpUtil.logout();
 
@@ -189,16 +195,6 @@ public class UserAuthServiceImpl extends ServiceImpl<UserAuthMapper, UserAuth> i
         userAuthMapper.updateById(userAuth);
     }
 
-
-
-
-
-
-
-
-
-
-
     @Transactional(rollbackFor = Exception.class)
     @Override
     public void register(UserVO user) {
@@ -260,13 +256,29 @@ public class UserAuthServiceImpl extends ServiceImpl<UserAuthMapper, UserAuth> i
         // 发送验证码
         EmailDTO emailDTO = EmailDTO.builder()
                 .email(username)
-                .subject("验证码")
+                .subject("ladidol'blog 验证码")
                 .content("您的验证码为 " + code + " 有效期15分钟，请不要告诉他人哦！")
                 .build();
         rabbitTemplate.convertAndSend(EMAIL_EXCHANGE, "*", new Message(JSON.toJSONBytes(emailDTO), new MessageProperties()));
         // 将验证码存入redis，设置过期时间为15分钟
         redisService.set(USER_CODE_KEY + username, code, CODE_EXPIRE_TIME);
     }
+//
+//    @Transactional(rollbackFor = Exception.class)
+//    @Override
+//    public UserInfoDTO qqLogin(QQLoginVO qqLoginVO) {
+//        return socialLoginStrategyContext.executeLoginStrategy(JSON.toJSONString(qqLoginVO), LoginTypeEnum.QQ);
+//    }
+
+    @Transactional(rollbackFor = AppException.class)
+    @Override
+    public UserInfoDTO weiboLogin(WeiboLoginVO weiboLoginVO) {
+        return socialLoginStrategyContext.executeLoginStrategy(JSON.toJSONString(weiboLoginVO), LoginTypeEnum.WEIBO);
+    }
+
+
+
+
 //
 //    @Override
 //    public List<UserAreaDTO> listUserAreas(ConditionVO conditionVO) {
