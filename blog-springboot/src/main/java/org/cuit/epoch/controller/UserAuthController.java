@@ -8,12 +8,11 @@ import org.cuit.epoch.dto.UserInfoDTO;
 import org.cuit.epoch.service.UserAuthService;
 import org.cuit.epoch.util.Result;
 import org.cuit.epoch.vo.UserVO;
-import org.cuit.epoch.vo.WeiboLoginVO;
+import org.cuit.epoch.vo.strategy.login.WeiboLoginVO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import javax.validation.Valid;
-import java.util.List;
 
 /**
  * @author: ladidol

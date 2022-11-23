@@ -31,7 +31,7 @@ import org.cuit.epoch.strategy.context.SocialLoginStrategyContext;
 import org.cuit.epoch.util.IpUtils;
 import org.cuit.epoch.util.PasswordUtils;
 import org.cuit.epoch.vo.UserVO;
-import org.cuit.epoch.vo.WeiboLoginVO;
+import org.cuit.epoch.vo.strategy.login.WeiboLoginVO;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageProperties;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;

@@ -5,9 +5,7 @@ import org.cuit.epoch.dto.UserDetailDTO;
 import org.cuit.epoch.dto.UserInfoDTO;
 import org.cuit.epoch.entity.UserAuth;
 import org.cuit.epoch.vo.UserVO;
-import org.cuit.epoch.vo.WeiboLoginVO;
-
-import java.util.List;
+import org.cuit.epoch.vo.strategy.login.WeiboLoginVO;
 
 /**
  * @author: ladidol
