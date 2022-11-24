@@ -35,7 +35,7 @@ public class BlogInfoController {
      *
      * @return {@link Result<BlogHomeInfoDTO>} 博客信息
      */
-    @ApiOperation(value = "查看博客信息")
+    @ApiOperation(value = "查看博客网站主页基本信息")
     @GetMapping("/")
     public Result<BlogHomeInfoDTO> getBlogHomeInfo() {
         return Result.ok(blogInfoService.getBlogHomeInfo());

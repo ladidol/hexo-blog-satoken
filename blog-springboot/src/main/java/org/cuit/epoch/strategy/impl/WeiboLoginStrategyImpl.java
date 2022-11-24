@@ -78,9 +78,10 @@ public class WeiboLoginStrategyImpl extends AbstractSocialLoginStrategyImpl {
         weiboData.add(CLIENT_SECRET, weiboConfigProperties.getAppSecret());
         weiboData.add(GRANT_TYPE, weiboConfigProperties.getGrantType());
         weiboData.add(REDIRECT_URI, weiboConfigProperties.getRedirectUrl());
-        weiboData.add(CODE, weiBoLoginVO.getCode());
+        weiboData.add(CODE, weiBoLoginVO.getCode());//前端传过来的回调code（openId）
         HttpEntity<MultiValueMap<String, String>> requestEntity = new HttpEntity<>(weiboData, null);
         try {
+            //通过post访问https://api.weibo.com/oauth2/access_token带上这五个请求参数
             return restTemplate.exchange(weiboConfigProperties.getAccessTokenUrl(), HttpMethod.POST, requestEntity, WeiboTokenDTO.class).getBody();
         } catch (Exception e) {
             throw new AppException(WEIBO_LOGIN_ERROR);

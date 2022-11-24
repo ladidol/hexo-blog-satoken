@@ -10,6 +10,7 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
 import org.cuit.epoch.dto.UserDetailDTO;
+import org.cuit.epoch.dto.UserInfoDTO;
 import org.cuit.epoch.entity.UserAuth;
 import org.cuit.epoch.entity.UserInfo;
 import org.cuit.epoch.exception.AppException;
@@ -21,15 +22,14 @@ import org.cuit.epoch.service.UserAuthService;
 import org.cuit.epoch.util.IpUtils;
 import org.cuit.epoch.util.PasswordUtils;
 import org.cuit.epoch.util.Result;
+import org.cuit.epoch.vo.strategy.login.WeiboLoginVO;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.PostConstruct;
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
+import javax.validation.Valid;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
@@ -57,7 +57,7 @@ public class LoginController {
 
 
     @PostMapping("login")
-    @ApiOperation(value = "账号密码登录")
+    @ApiOperation(value = "邮箱密码登录")
     public Result<UserDetailDTO> login(String username, String password) {
         UserDetailDTO userDetailDTO = userAuthService.login(username, password);
         return Result.ok(userDetailDTO);
@@ -69,6 +69,31 @@ public class LoginController {
         userAuthService.logout();
         return Result.ok("注销成功");
     }
+
+
+    /**
+     * 微博登录
+     *
+     * @param weiBoLoginVO 微博登录信息
+     * @return {@link Result< UserInfoDTO >} 用户信息
+     */
+    @ApiOperation(value = "微博登录")
+    @PostMapping("/users/oauth/weibo")
+    public Result<UserInfoDTO> weiboLogin(@Valid @RequestBody WeiboLoginVO weiBoLoginVO) {
+        return Result.ok(userAuthService.weiboLogin(weiBoLoginVO));
+    }
+
+//    /**
+//     * qq登录
+//     *
+//     * @param qqLoginVO qq登录信息
+//     * @return {@link Result<UserInfoDTO>} 用户信息
+//     */
+//    @ApiOperation(value = "qq登录")
+//    @PostMapping("/users/oauth/qq")
+//    public Result<UserInfoDTO> qqLogin(@Valid @RequestBody QQLoginVO qqLoginVO) {
+//        return Result.ok(userAuthService.qqLogin(qqLoginVO));
+//    }
 
 
 }

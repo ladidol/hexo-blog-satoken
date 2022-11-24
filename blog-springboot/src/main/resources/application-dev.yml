@@ -126,16 +126,18 @@ upload:
     bucketName: cos的bucketName
 
 
-#第三方配置信息 todo 这里qq开发者信息没有填写，网站不允许申请！
+#第三方配置信息 todo 这里qq开发者信息没有填写，网站不允许申请！，值得注意的是qq和微博的第三方登录都需要在前端/src/asserts/js/config.js中配置一下
 qq:
   app-id: QQ APPID
   check-token-url: https://graph.qq.com/oauth2.0/me?access_token={access_token}
   user-info-url: https://graph.qq.com/user/get_user_info?openid={openid}&access_token={access_token}&oauth_consumer_key={oauth_consumer_key}
 
 weibo:
-  app-id: 微博APPID
-  app-secret: 微博APPSECRET
+  app-id: 3318742150
+  app-secret: eda0e1b40eae1442208cf4fb59f967d3
   grant-type: authorization_code
-  redirect-url: 微博回调地址
+  redirect-url: http://blog.ladidol.top/oauth/login/weibo
+  #获取用户
   access-token-url: https://api.weibo.com/oauth2/access_token
+  #获取用户昵称和头像url的
   user-info-url: https://api.weibo.com/2/users/show.json?uid={uid}&access_token={access_token}

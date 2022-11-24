@@ -23,7 +23,7 @@ public class WeiboLoginVO {
      * code
      */
     @NotBlank(message = "code不能为空")
-    @ApiModelProperty(name = "openId", value = "qq openId", required = true, dataType = "String")
+    @ApiModelProperty(name = "openId", value = "weibo openId", required = true, dataType = "String")
     private String code;
 
 }

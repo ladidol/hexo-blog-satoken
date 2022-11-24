@@ -103,28 +103,6 @@ public class UserAuthController {
 //        return Result.ok();
 //    }
 
-    /**
-     * 微博登录
-     *
-     * @param weiBoLoginVO 微博登录信息
-     * @return {@link Result<UserInfoDTO>} 用户信息
-     */
-    @ApiOperation(value = "微博登录")
-    @PostMapping("/users/oauth/weibo")
-    public Result<UserInfoDTO> weiboLogin(@Valid @RequestBody WeiboLoginVO weiBoLoginVO) {
-        return Result.ok(userAuthService.weiboLogin(weiBoLoginVO));
-    }
 
-//    /**
-//     * qq登录
-//     *
-//     * @param qqLoginVO qq登录信息
-//     * @return {@link Result<UserInfoDTO>} 用户信息
-//     */
-//    @ApiOperation(value = "qq登录")
-//    @PostMapping("/users/oauth/qq")
-//    public Result<UserInfoDTO> qqLogin(@Valid @RequestBody QQLoginVO qqLoginVO) {
-//        return Result.ok(userAuthService.qqLogin(qqLoginVO));
-//    }
 
 }

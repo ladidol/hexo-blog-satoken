@@ -17,7 +17,7 @@ import lombok.NoArgsConstructor;
 public class WeiboTokenDTO {
 
     /**
-     * 微博uid
+     * 微博用户的uid
      */
     private String uid;
 

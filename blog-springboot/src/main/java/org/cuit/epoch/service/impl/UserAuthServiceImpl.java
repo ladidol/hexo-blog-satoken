@@ -256,7 +256,7 @@ public class UserAuthServiceImpl extends ServiceImpl<UserAuthMapper, UserAuth> i
         // 发送验证码
         EmailDTO emailDTO = EmailDTO.builder()
                 .email(username)
-                .subject("ladidol'blog 验证码")
+                .subject("ladidol'blog 的验证码")
                 .content("您的验证码为 " + code + " 有效期15分钟，请不要告诉他人哦！")
                 .build();
         rabbitTemplate.convertAndSend(EMAIL_EXCHANGE, "*", new Message(JSON.toJSONBytes(emailDTO), new MessageProperties()));

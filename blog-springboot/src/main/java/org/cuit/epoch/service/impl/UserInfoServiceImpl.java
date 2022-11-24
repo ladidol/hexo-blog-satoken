@@ -54,7 +54,7 @@ public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> i
         log.info("loginId = " + StpUtil.getLoginId() + " 更改用户信息");
         // 2022/11/21 值得注意的是，需要存入redis中的序列化对象需要有构造函数。
 //        UserDetailDTO userDetailDTO = (UserDetailDTO) redisService.get(USER_INFO + StpUtil.getLoginId());
-        // TODO: 2022/11/22 这里就直接从session中拿用户信息吧。
+        // 2022/11/22 这里就直接从session中拿用户信息吧。
         UserDetailDTO userDetailDTO  = (UserDetailDTO) StpUtil.getSession().get(USER_INFO);
 
         // 封装用户信息
@@ -75,7 +75,7 @@ public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> i
         String avatar = uploadStrategyContext.executeUploadStrategy(file, FilePathEnum.AVATAR.getPath());
 //        UserDetailDTO userDetailDTO = (UserDetailDTO) redisService.get(USER_INFO + StpUtil.getLoginId());
         UserDetailDTO userDetailDTO  = (UserDetailDTO) StpUtil.getSession().get(USER_INFO);
-        // TODO: 2022/11/22 这里就直接从session中拿用户信息吧。
+        // 2022/11/22 这里就直接从session中拿用户信息吧。
         // 更新用户信息
         UserInfo userInfo = UserInfo.builder()
                 .id(userDetailDTO.getUserInfoId())
@@ -91,7 +91,7 @@ public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> i
         log.info("loginId = " + StpUtil.getLoginId() + " 更改用户邮箱");
 //        UserDetailDTO userDetailDTO = (UserDetailDTO) redisService.get(USER_INFO + StpUtil.getLoginId());
         UserDetailDTO userDetailDTO  = (UserDetailDTO) StpUtil.getSession().get(USER_INFO);
-        // TODO: 2022/11/22 这里就直接从session中拿用户信息吧。
+        // 2022/11/22 这里就直接从session中拿用户信息吧。
         //依旧需要进行邮箱验证
         if (!emailVO.getCode().equals(redisService.get(USER_CODE_KEY + emailVO.getEmail()).toString())) {
             throw new AppException("验证码错误！");

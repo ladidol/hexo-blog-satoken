@@ -19,7 +19,7 @@ import java.util.List;
 /**
  * @author: ladidol
  * @date: 2022/11/18 16:02
- * @description:
+ * @description: 资源角色管理策略
  */
 
 
