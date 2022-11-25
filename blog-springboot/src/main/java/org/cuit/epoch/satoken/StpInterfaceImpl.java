@@ -1,6 +1,7 @@
 package org.cuit.epoch.satoken;
 
 import cn.dev33.satoken.stp.StpInterface;
+import cn.dev33.satoken.stp.StpUtil;
 import org.cuit.epoch.mapper.RoleMapper;
 import org.cuit.epoch.service.RedisService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -48,7 +49,9 @@ public class StpInterfaceImpl implements StpInterface {
     @Override
     public List<String> getRoleList(Object loginId, String loginType) {
         // 从redis中查询当前用户的角色列表
-        List<String> list = (List<String>) redisService.get(USER_ROLE + loginId);
+//        List<String> list = (List<String>) redisService.get(USER_ROLE + loginId);
+        //从session中共拿角色
+        List<String> list = (List<String>) StpUtil.getSession().get(USER_ROLE);
         return list;
     }
 

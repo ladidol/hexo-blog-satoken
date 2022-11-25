@@ -30,7 +30,8 @@ public class todolist {
     // 2022/11/21 又出现了一些问题：就是userInfoId和userAuthId是不一样的，比如updateUserInfo里面传的参数应该是infoid。解决通过存入redis中共的用户信息获取infoId
     @Autowired
     private Map<String, UploadStrategy> uploadStrategyMap;
-    // TODO: 2022/11/21 这里感觉好帅啊 ，这个策略模式，UploadStrategy实现类通过@Service("localUploadStrategyImpl")，就能直接用Map来获取。
+    // 在spring中，根据spring的特性，Spring 会在启动时，自动查找实现了该接口的 bean，放到这个Map中去。key为bean的名字，value为 实现了该接口的所有的 bean。通过这种方式，就可以不用再通过构造方法将实现的策略类传入
+    //2022/11/21 这里感觉好帅啊 ，这个策略模式，UploadStrategy实现类通过@Service("localUploadStrategyImpl")，就能直接用Map来获取。
     //用户redis信息添加
     //redisService.set(USER_INFO + StpUtil.getLoginId(),userDetailDTO);
     //2022/11/21 这里的userDetailsDTO存入redis中共报错， Could not write JSON: Java 8 date/time type `java.time.LocalDateTime` 。解决：    @JsonDeserialize(using = LocalDateTimeDeserializer.class)
@@ -47,7 +48,12 @@ public class todolist {
 
 
     //=====================================================博客信息模块============================================================================
-    // TODO: 2022/11/24 我在想，博客的访问量是怎么更新到redis中去的了，还有用户的访问量是怎么更新到redis中去的呢 
+    // TODO: 2022/11/24 我在想，博客的访问量是怎么更新到redis中去的了，还有用户的访问量是怎么更新到redis中去的呢
+
+
+    //=====================================================项目框架的部分知识点============================================================================
+    // TODO: 2022/11/25 一些错误的报错的返回 
+
 
 
 
@@ -58,6 +64,38 @@ public class todolist {
     // TODO: 2022/11/16 可以好好看一下首页的实现，比如每个页面的一些基本信息都是保存在redis中，这样查询能快不少。
     // TODO: 2022/11/21 可以试一下github的cicd，或者自己搭建一个gitlab
     // TODO: 2022/11/23 把一些类的简介好好写一下。
+    // TODO: 2022/11/25 @ApiModelProperty(name = "name", value = "菜单名", dataType = "String",required = true) 给一些类属性上面都添加一下required = true吧。
+
+
+    //=====================================================待学的部分知识点============================================================================
+    // TODO: 2022/11/25 无聊可以把Stream流部分好好补一下，比如下面对菜单进行分类传给前端就很帅！！！！
+    //  /**
+    //     * 获取目录列表
+    //     *
+    //     * @param menuList 菜单列表
+    //     * @return 目录列表
+    //     */
+    //    private List<Menu> listCatalog(List<Menu> menuList) {
+    //        return menuList.stream()
+    //                .filter(item -> Objects.isNull(item.getParentId()))
+    //                .sorted(Comparator.comparing(Menu::getOrderNum))
+    //                .collect(Collectors.toList());
+    //    }
+    //    /**
+    //     * 获取目录下菜单列表
+    //     *
+    //     * @param menuList 菜单列表
+    //     * @return 目录下的菜单列表
+    //     */
+    //    private Map<Integer, List<Menu>> getMenuMap(List<Menu> menuList) {
+    //        return menuList.stream()
+    //                .filter(item -> Objects.nonNull(item.getParentId()))
+    //                .collect(Collectors.groupingBy(Menu::getParentId));
+    //    }
+
+
+
+
 
 
 }

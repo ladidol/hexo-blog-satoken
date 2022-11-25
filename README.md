@@ -299,8 +299,6 @@ StpUtil.logout();
 
 对微博登录的实现可以先看一下这篇文章[springboot实现微博登录 - 腾讯云开发者社区-腾讯云 (tencent.com)](https://cloud.tencent.com/developer/article/1640072)
 
-
-
 1. 最先访问接口：从而可以openId；`https://api.weibo.com/oauth2/authorize?client_id=你的appkey&response_type=code&redirect_uri=你的回调地址`
 
 2. 前端对博客后端发起请求：携带参数`openId`访问你的回调地址`http://blog.ladidol.top/oauth/login/weibo`
@@ -416,7 +414,29 @@ StpUtil.logout();
 
 #### 实现细节
 
+
+
+[理解OAuth 2.0 - 阮一峰的网络日志 (ruanyifeng.com)](http://www.ruanyifeng.com/blog/2014/05/oauth_2_0.html)
+
+![web实现QQ第三方登录_编程](https://figurebed-ladidol.oss-cn-chengdu.aliyuncs.com/img/202211241958214.webp)
+
+
+
+
+
 todo
+
+
+
+
+
+
+
+
+
+
+
+
 
 ## 用户账号模块
 
@@ -678,6 +698,298 @@ username即邮箱账号
    ```
 
 4. 页面信息，调用了**页面模块**中的listPages方法，和网站配置一样redis-mysql持久化访问机制。
+
+## 后台菜单模块
+
+### 1）查看当前用户菜单列表
+
+#### 参数
+
+需要带cookie访问的同时要从里面的到userInfoId方便后面操作
+
+#### 简介
+
+通过当前登录者的userInfoId得到用户能访问的菜单组件列表。
+
+#### 实现细节
+
+1. 的到用户的能访问的菜单列表`menuList`：
+
+   ```java
+   // 查询用户菜单信息（根据用户查询捏）
+   UserDetailDTO userDetailDTO = (UserDetailDTO) StpUtil.getSession().get(USER_INFO);
+   List<Menu> menuList = menuMapper.listMenusByUserInfoId(userDetailDTO.getUserInfoId());
+   ```
+
+2. 获取主目录列表`catalogList`:
+
+   ```java
+   // 获取主目录列表
+   List<Menu> catalogList = listCatalog(menuList);
+   ```
+
+   `listCatalog`通过filter筛选parentId字段**为空**的目录，并将他们重新用list返回
+
+   ```java
+   /**
+        * 获取目录列表
+        *
+        * @param menuList 菜单列表
+        * @return 目录列表
+        */
+   private List<Menu> listCatalog(List<Menu> menuList) {
+       return menuList.stream()
+           .filter(item -> Objects.isNull(item.getParentId()))
+           .sorted(Comparator.comparing(Menu::getOrderNum))
+           .collect(Collectors.toList());
+   }
+   ```
+
+3. 获取每一个主目录下的子菜单`childrenMap`:
+
+   ```java
+   // 获取主目录下的子菜单
+   Map<Integer, List<Menu>> childrenMap = getMenuMap(menuList);
+   ```
+
+   `getMenuMap`通过filter筛选parentId字段是**不为空**的目录，并将他们用map返回，key为parentId，value为对应下的子菜单list
+
+   ```java
+   /**
+        * 获取目录下菜单列表
+        *
+        * @param menuList 菜单列表
+        * @return 目录下的菜单列表
+        */
+   private Map<Integer, List<Menu>> getMenuMap(List<Menu> menuList) {
+       return menuList.stream()
+           .filter(item -> Objects.nonNull(item.getParentId()))
+           .collect(Collectors.groupingBy(Menu::getParentId));
+   }
+   ```
+
+4. 转换目录结构，发给前端就成了主目录+其子目录的格式
+
+   ```java
+   /**
+        * 转换用户菜单格式
+        *
+        * @param catalogList 目录
+        * @param childrenMap 子菜单
+        */
+   private List<UserMenuDTO> convertUserMenuList(List<Menu> catalogList, Map<Integer, List<Menu>> childrenMap) {
+       return catalogList.stream().map(item -> {
+           // 获取目录
+           UserMenuDTO userMenuDTO = new UserMenuDTO();
+           List<UserMenuDTO> list = new ArrayList<>();
+           // 获取目录下的子菜单
+           List<Menu> children = childrenMap.get(item.getId());
+           if (CollectionUtils.isNotEmpty(children)) {
+               // 多级菜单处理
+               userMenuDTO = BeanCopyUtils.copyObject(item, UserMenuDTO.class);
+               list = children.stream()
+                   .sorted(Comparator.comparing(Menu::getOrderNum))
+                   .map(menu -> {
+                       UserMenuDTO dto = BeanCopyUtils.copyObject(menu, UserMenuDTO.class);
+                       dto.setHidden(menu.getIsHidden().equals(TRUE));
+                       return dto;
+                   })
+                   .collect(Collectors.toList());
+           } else {
+               // 一级菜单处理
+               userMenuDTO.setPath(item.getPath());
+               userMenuDTO.setComponent(COMPONENT);
+               list.add(UserMenuDTO.builder()
+                        .path("")
+                        .name(item.getName())
+                        .icon(item.getIcon())
+                        .component(item.getComponent())
+                        .build());
+           }
+           userMenuDTO.setHidden(item.getIsHidden().equals(TRUE));
+           userMenuDTO.setChildren(list);
+           return userMenuDTO;
+       }).collect(Collectors.toList());
+   }
+   ```
+
+
+
+### 2）查看全部菜单列表
+
+#### 参数
+
+无
+
+#### 简介
+
+类似前面单个用户的菜单列表获取，只是这里直接获取全部的了
+
+#### 实现细节
+
+1. 也是先得到主目录和对应子目录，然后进行拼接操作。
+
+   ```java
+   @Override
+   public List<MenuDTO> listMenus(ConditionVO conditionVO) {
+       // 查询菜单数据(获取全部菜单)
+       List<Menu> menuList = menuMapper.selectList(new LambdaQueryWrapper<Menu>()
+                                                   .like(StringUtils.isNotBlank(conditionVO.getKeywords()), Menu::getName, conditionVO.getKeywords()));
+       log.info("获取目录列表 menuList = " + menuList);
+       // 获取目录列表
+       List<Menu> catalogList = listCatalog(menuList);
+       log.info("获取目录列表 catalogList = " + catalogList);
+       // 获取目录下的子菜单
+       Map<Integer, List<Menu>> childrenMap = getMenuMap(menuList);
+       // 组装目录菜单数据
+       List<MenuDTO> menuDTOList = catalogList.stream().map(item -> {
+           MenuDTO menuDTO = BeanCopyUtils.copyObject(item, MenuDTO.class);
+           // 获取目录下的菜单排序
+           List<MenuDTO> list = BeanCopyUtils.copyList(childrenMap.get(item.getId()), MenuDTO.class).stream()
+               .sorted(Comparator.comparing(MenuDTO::getOrderNum))
+               .collect(Collectors.toList());
+           menuDTO.setChildren(list);
+           childrenMap.remove(item.getId());
+           return menuDTO;
+       }).sorted(Comparator.comparing(MenuDTO::getOrderNum)).collect(Collectors.toList());
+       // 若还有菜单未取出则拼接
+       if (CollectionUtils.isNotEmpty(childrenMap)) {
+           List<Menu> childrenList = new ArrayList<>();
+           childrenMap.values().forEach(childrenList::addAll);
+           List<MenuDTO> childrenDTOList = childrenList.stream()
+               .map(item -> BeanCopyUtils.copyObject(item, MenuDTO.class))
+               .sorted(Comparator.comparing(MenuDTO::getOrderNum))
+               .collect(Collectors.toList());
+           menuDTOList.addAll(childrenDTOList);
+       }
+       return menuDTOList;
+   }
+   ```
+
+   
+
+### 3）新增或修改菜单
+
+#### 参数
+
+```json
+{
+  "component": {},
+  "icon": {},
+  "id": {},
+  "isHidden": {},
+  "name": {},
+  "orderNum": {},
+  "parentId": {},
+  "path": {}
+}
+```
+
+#### 简介
+
+新增或修改菜单，
+
+#### 实现细节
+
+1. 这个copyObject的方式来直接快速调用Mybatis-Plus的方法，直接一个赞！
+
+   ```java
+   Menu menu = BeanCopyUtils.copyObject(menuVO, Menu.class);
+   this.saveOrUpdate(menu);
+   ```
+
+### 4）删除菜单
+
+#### 参数
+
+menuId
+
+#### 简介
+
+通过menuId来删除菜单，但是删除的菜单必须满足不和其他用户有绑定的
+
+#### 实现细节
+
+1. 先通过**角色—菜单**表查询是否有角色和该菜单关联：
+
+   ```java
+   // 查询是否有角色关联
+   Integer count = roleMenuDao.selectCount(new LambdaQueryWrapper<RoleMenu>()
+                                           .eq(RoleMenu::getMenuId, menuId));
+   if (count > 0) {
+       throw new AppException("菜单下有角色关联");
+   }
+   ```
+
+2. 查询改菜单的子菜单，得到ids链表，一起删除全部：
+
+   ```java
+   // 查询子菜单
+   List<Integer> menuIdList = menuMapper.selectList(new LambdaQueryWrapper<Menu>()
+                                                    .select(Menu::getId)
+                                                    .eq(Menu::getParentId, menuId))
+       .stream()
+       .map(Menu::getId)
+       .collect(Collectors.toList());
+   menuIdList.add(menuId);
+   menuMapper.deleteBatchIds(menuIdList);
+   ```
+
+   
+
+### 5）查看角色菜单选项
+
+#### 参数
+
+无
+
+#### 简介
+
+查询全部角色所管理的菜单，这里直接返回全部就行，其实和上面第二个接口有点类似，只是这里可以快速查询。
+
+#### 实现细节
+
+1. 依旧是先得到主目录和对应子目录，然后进行拼接操作。这里用mapper层的select方法方便快捷的查询这四个字段的数据：
+
+   ```java
+   // 查询菜单数据(只查询id、name、parentId、orderNum四个字段)
+   List<Menu> menuList = menuMapper.selectList(new LambdaQueryWrapper<Menu>()
+           .select(Menu::getId, Menu::getName, Menu::getParentId, Menu::getOrderNum));
+   // 获取目录列表
+   List<Menu> catalogList = listCatalog(menuList);
+   // 获取目录下的子菜单
+   Map<Integer, List<Menu>> childrenMap = getMenuMap(menuList);
+   // 组装目录菜单数据
+   return catalogList.stream().map(item -> {
+       // 获取目录下的菜单排序
+       List<LabelOptionDTO> list = new ArrayList<>();
+       List<Menu> children = childrenMap.get(item.getId());
+       if (CollectionUtils.isNotEmpty(children)) {
+           list = children.stream()
+                   .sorted(Comparator.comparing(Menu::getOrderNum))
+                   .map(menu -> LabelOptionDTO.builder()
+                           .id(menu.getId())
+                           .label(menu.getName())
+                           .build())
+                   .collect(Collectors.toList());
+       }
+       return LabelOptionDTO.builder()
+               .id(item.getId())
+               .label(item.getName())
+               .children(list)
+               .build();
+   }).collect(Collectors.toList());
+   ```
+
+
+
+
+
+
+
+
+
+
 
 
 

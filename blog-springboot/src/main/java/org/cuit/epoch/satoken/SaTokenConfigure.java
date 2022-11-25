@@ -79,6 +79,7 @@ public class SaTokenConfigure implements WebMvcConfigurer {
                 .setError(e -> {
                     // 2022/11/18 这里就是用户权限不足的时候
                     log.info(e.getMessage());
+                    e.printStackTrace();
                     return SaResult.error(e.getMessage());
                 })
 
