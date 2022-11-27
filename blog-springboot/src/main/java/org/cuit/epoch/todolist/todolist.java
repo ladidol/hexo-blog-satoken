@@ -43,6 +43,7 @@ public class todolist {
     // 2022/11/17 把密码加密用SpringSecurity的加密先用到起，因为后续需要和security_hexo_blog项目一起共用一个数据库，或者把SpringSecurity项目中的加密用PasswordUtil来做。
     // 2022/11/17 重写一下Security的passwordEcoder方法。bingo
     // TODO: 2022/11/22 这里可以将登录信息放到Sa-token中管理，原先的登录和第三方登录都可以
+    // TODO: 2022/11/25 需要根据这个博客来改一下vue前端中的一些配置https://www.talkxj.com/articles/3 ,/public/index.html中
 
 
 
@@ -69,29 +70,9 @@ public class todolist {
 
     //=====================================================待学的部分知识点============================================================================
     // TODO: 2022/11/25 无聊可以把Stream流部分好好补一下，比如下面对菜单进行分类传给前端就很帅！！！！
-    //  /**
-    //     * 获取目录列表
-    //     *
-    //     * @param menuList 菜单列表
-    //     * @return 目录列表
-    //     */
-    //    private List<Menu> listCatalog(List<Menu> menuList) {
-    //        return menuList.stream()
-    //                .filter(item -> Objects.isNull(item.getParentId()))
-    //                .sorted(Comparator.comparing(Menu::getOrderNum))
-    //                .collect(Collectors.toList());
-    //    }
-    //    /**
-    //     * 获取目录下菜单列表
-    //     *
-    //     * @param menuList 菜单列表
-    //     * @return 目录下的菜单列表
-    //     */
-    //    private Map<Integer, List<Menu>> getMenuMap(List<Menu> menuList) {
-    //        return menuList.stream()
-    //                .filter(item -> Objects.nonNull(item.getParentId()))
-    //                .collect(Collectors.groupingBy(Menu::getParentId));
-    //    }
+    // TODO: 2022/11/25 需要将博客换成https，有空的话 
+    
+    
 
 
 

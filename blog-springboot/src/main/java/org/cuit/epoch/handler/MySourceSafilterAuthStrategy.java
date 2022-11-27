@@ -46,7 +46,7 @@ public class MySourceSafilterAuthStrategy implements SaFilterAuthStrategy {
     @PostConstruct // 在Spring中：Constructor >> @Autowired >> @PostConstruct
     private void loadDataSource() {
         resourceRoleList = roleDao.listResourceRoles();
-        log.info("resourceRoleList = " + resourceRoleList);
+        log.info("服务器 resourceRoleList 加载： " + resourceRoleList);
     }
 
     /**
@@ -54,6 +54,7 @@ public class MySourceSafilterAuthStrategy implements SaFilterAuthStrategy {
      */
     public void clearDataSource() {
         resourceRoleList = null;
+        log.info("服务器 resourceRoleList 清空");
     }
 
     /**

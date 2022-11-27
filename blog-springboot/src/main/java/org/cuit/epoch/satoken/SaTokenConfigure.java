@@ -7,7 +7,9 @@ import cn.dev33.satoken.router.SaRouter;
 import cn.dev33.satoken.stp.StpUtil;
 import cn.dev33.satoken.util.SaResult;
 import lombok.extern.slf4j.Slf4j;
+import org.cuit.epoch.exception.AppException;
 import org.cuit.epoch.handler.MySourceSafilterAuthStrategy;
+import org.cuit.epoch.util.Result;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -80,7 +82,10 @@ public class SaTokenConfigure implements WebMvcConfigurer {
                     // 2022/11/18 这里就是用户权限不足的时候
                     log.info(e.getMessage());
                     e.printStackTrace();
-                    return SaResult.error(e.getMessage());
+                    if (e instanceof AppException){
+                        return Result.fail(e.getMessage());
+                    }
+                    return Result.fail(e.getMessage()+"：用户未登录");
                 })
 
                 // 前置函数：在每次认证函数之前执行

@@ -401,6 +401,7 @@ StpUtil.logout();
 1. 值得注意的是第三方登录得到的username是openId，只是可以在userinfo表里面设置邮箱地址方便通知！
 2. 这里面后端通过`RestTemplate`来带参数发请求
 3. 这里用了一下策略模式来管理规范遵循`oauth2`第三方登录
+3. [策略模式初见 (talkxj.com)](https://www.talkxj.com/articles/30)这里有对策略模式的一些使用，感觉好帅。
 
 ### 4）QQ第三方登录
 
@@ -414,7 +415,7 @@ StpUtil.logout();
 
 #### 实现细节
 
-
+[项目配置介绍 (talkxj.com)](https://www.talkxj.com/articles/3)
 
 [理解OAuth 2.0 - 阮一峰的网络日志 (ruanyifeng.com)](http://www.ruanyifeng.com/blog/2014/05/oauth_2_0.html)
 
@@ -819,11 +820,11 @@ username即邮箱账号
 
 #### 参数
 
-无
+关键字keywords，用类ConditionVO来获取
 
 #### 简介
 
-类似前面单个用户的菜单列表获取，只是这里直接获取全部的了
+类似前面单个用户的菜单列表获取，只是这里根据关键字keywords来获取列表
 
 #### 实现细节
 
@@ -937,7 +938,7 @@ menuId
 
    
 
-### 5）查看角色菜单选项
+### 5）查看全部角色菜单选项
 
 #### 参数
 
@@ -983,15 +984,220 @@ menuId
 
 
 
+## 资源模块
 
+### 1）查看全部资源列表
 
+#### 参数
 
+keywords关键字，这里用ConditionVo类来封装。
 
+#### 简介
 
+直接通过关键字来模糊查询，如果没有关键字直接返回全部列表
 
+#### 实现细节
 
+1. 依旧是先得到全部资源列表
 
+   ```java
+   // 查询资源列表
+   List<Resource> resourceList = resourceDao.selectList(new LambdaQueryWrapper<Resource>()
+                                                        .like(StringUtils.isNotBlank(conditionVO.getKeywords()), Resource::getResourceName, conditionVO.getKeywords()));
+   ```
 
+2. 得到父资源模块列表，直接根据`parentId`判断就行
 
+   ```java
+   // 获取所有模块
+   List<Resource> parentList = listResourceModule(resourceList);
+   
+   ......
+   
+   /**
+        * 获取所有资源模块
+        *
+        * @param resourceList 资源列表
+        * @return 资源模块列表
+        */
+   private List<Resource> listResourceModule(List<Resource> resourceList) {
+       return resourceList.stream()
+           .filter(item -> Objects.isNull(item.getParentId()))
+           .collect(Collectors.toList());
+   }
+   ```
 
+3. 根据父id分组获得该父模块下的资源列表，用map来装`Map<Integer, List<Resource>> childrenMap`
 
+   ```java
+   // 根据父id分组获取模块下的资源
+   Map<Integer, List<Resource>> childrenMap = listResourceChildren(resourceList);
+   
+   
+   /**
+        * 获取模块下的所有资源
+        *
+        * @param resourceList 资源列表
+        * @return 模块资源
+        */
+   private Map<Integer, List<Resource>> listResourceChildren(List<Resource> resourceList) {
+       return resourceList.stream()
+           .filter(item -> Objects.nonNull(item.getParentId()))
+           .collect(Collectors.groupingBy(Resource::getParentId));
+   }
+   ```
+
+4. 将父模块与子模块list绑定：
+
+   ```java
+   // 绑定模块下的所有接口
+   List<ResourceDTO> resourceDTOList = parentList.stream().map(item -> {
+       ResourceDTO resourceDTO = BeanCopyUtils.copyObject(item, ResourceDTO.class);
+       List<ResourceDTO> childrenList = BeanCopyUtils.copyList(childrenMap.get(item.getId()), ResourceDTO.class);
+       resourceDTO.setChildren(childrenList);
+       childrenMap.remove(item.getId());
+       return resourceDTO;
+   }).collect(Collectors.toList());
+   ```
+
+5. 如果有子模块没有分到对应的父模块中去，就直接加在最后一起返回，就如果一个父模块一样
+
+   ```java
+   // 若还有资源未取出则拼接
+   if (CollectionUtils.isNotEmpty(childrenMap)) {
+       List<Resource> childrenList = new ArrayList<>();
+       childrenMap.values().forEach(childrenList::addAll);
+       List<ResourceDTO> childrenDTOList = childrenList.stream()
+           .map(item -> BeanCopyUtils.copyObject(item, ResourceDTO.class))
+           .collect(Collectors.toList());
+       resourceDTOList.addAll(childrenDTOList);
+   }
+   ```
+
+#### 注意
+
+这里里面再一次使用了stream来解决父子模块的绑定，很帅气！
+
+### 2）查看全部角色的资源列表
+
+#### 参数
+
+无。
+
+#### 简介
+
+查询全部角色所管理的资源列表，这里直接返回全部就行，其实和上面第一个接口有点类似，只是这里查询字段减少，加快了查询速度。
+
+#### 实现细节
+
+1. 其实和后台菜单模块中的第五个接口有点像：依旧是先得到主目录和对应子目录，然后进行拼接操作。这里用mapper层的select方法方便快捷的查询这三个字段的数据：
+
+   ```java
+   // 查询资源列表
+   List<Resource> resourceList = resourceDao.selectList(new LambdaQueryWrapper<Resource>()
+                                 .select(Resource::getId, Resource::getResourceName, Resource::getParentId)
+                                 .eq(Resource::getIsAnonymous, FALSE));
+   ```
+
+2. ```java
+   // 查询资源列表
+   List<Resource> resourceList = resourceDao.selectList(new LambdaQueryWrapper<Resource>()
+                                         .select(Resource::getId, Resource::getResourceName, Resource::getParentId)
+                                         .eq(Resource::getIsAnonymous, FALSE));
+   // 获取所有模块
+   List<Resource> parentList = listResourceModule(resourceList);
+   // 根据父id分组获取模块下的资源
+   Map<Integer, List<Resource>> childrenMap = listResourceChildren(resourceList);
+   // 组装父子数据
+   return parentList.stream().map(item -> {
+       List<LabelOptionDTO> list = new ArrayList<>();
+       List<Resource> children = childrenMap.get(item.getId());
+       if (CollectionUtils.isNotEmpty(children)) {
+           list = children.stream()
+               .map(resource -> LabelOptionDTO.builder()
+                    .id(resource.getId())
+                    .label(resource.getResourceName())
+                    .build())
+               .collect(Collectors.toList());
+       }
+       return LabelOptionDTO.builder()
+           .id(item.getId())
+           .label(item.getResourceName())
+           .children(list)
+           .build();
+   }).collect(Collectors.toList());
+   ```
+
+### 3）新增或修改资源
+
+#### 参数
+
+```java
+{
+  "id": {非必须},
+  "isAnonymous": {非必须，有默认值},
+  "parentId": {},
+  "requestMethod": {},
+  "resourceName": {},
+  "url": {}
+}
+```
+
+#### 简介
+
+通过传入一个resource对象，新增或修改资源。
+
+#### 实现细节
+
+1. 先更新资源信息
+
+   ```java
+   // 更新资源信息
+   Resource resource = BeanCopyUtils.copyObject(resourceVO, Resource.class);
+   this.saveOrUpdate(resource);
+   ```
+
+2. 重新加载角色资源信息到服务器中，方便下次请求时能正确鉴权
+
+   ```java
+   // 重新加载角色资源信息到服务器中
+   mySourceSafilterAuthStrategy.clearDataSource();
+   ```
+
+### 4）新增或修改资源
+
+#### 参数
+
+资源id就行
+
+#### 简介
+
+通过资源id删除，同时有子资源的话要删除全部子资源。
+
+#### 实现细节
+
+1. 先通过**角色—资源**表查询是否有角色和该资源关联：
+
+   ```java
+   Integer count = roleResourceDao.selectCount(new LambdaQueryWrapper<RoleResource>()
+                                               .eq(RoleResource::getResourceId, resourceId));
+   if (count > 0) {
+       throw new AppException("该资源下存在角色");
+   }
+   ```
+
+2. 构建一个`List<Integer> resourceIdList`链表来装需要删除的资源id，其中包括子资源：
+
+   ```java
+   // 删除子资源
+   List<Integer> resourceIdList = resourceDao.selectList(new LambdaQueryWrapper<Resource>()
+                                                         .select(Resource::getId).
+                                                         eq(Resource::getParentId, resourceId))
+       .stream()
+       .map(Resource::getId)
+       .collect(Collectors.toList());
+   resourceIdList.add(resourceId);
+   resourceDao.deleteBatchIds(resourceIdList);
+   ```
+
+   
