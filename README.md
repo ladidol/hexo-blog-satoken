@@ -3,11 +3,13 @@
 
 这里先简单的介绍一下每一个接口的实现，后面通过swagger来md导出，再将这些加进去。
 
+图形人机验证，这个是暂时使用的原博主的CaptchaAppId=2088053498，具体可以去这里https://main.qcloudimg.com/raw/document/product/pdf/1110_44904_cn.pdf
 
+## 自定义架构模块
 
-## 角色权限管理模块
+### 角色权限管理模块
 
-### 路由管理
+#### 路由管理
 
 通过SaTokenConfigure类：
 
@@ -174,9 +176,541 @@ public class MySourceSafilterAuthStrategy implements SaFilterAuthStrategy {
 
 每一个接口的访问权限or角色信息`resourceRoleList`在后端启动之时就随着类的实例化托管于Spring容器中了，每一次有被管理的请求发生都会走这个run方法，进行鉴权判断。
 
-### 角色管理
+#### 角色管理
 
 每一次接口的角色信息更新都会调一下`clearDataSource`清空`resourceRoleList`中的数据，同时下次接口访问的时候会调用`loadDataSource`将`resourceRoleList`重新加载
+
+### 限流注解拦截器
+
+#### 准备
+
+1. 自定一个redis接口限流注解
+
+   ```java
+   @Target(ElementType.METHOD)
+   @Retention(RetentionPolicy.RUNTIME)
+   @Documented
+   public @interface AccessLimit {
+   
+       /**
+        * 单位时间（秒）
+        *
+        * @return int
+        */
+       int seconds();
+   
+       /**
+        * 单位时间最大请求次数
+        *
+        * @return int
+        */
+       int maxCount();
+   }
+   
+   ```
+
+2. 标记在你想要限流的接口上
+
+   ```java
+   @AccessLimit(seconds = 6, maxCount = 1)
+   @ApiOperation(value = "发送邮箱验证码")
+   @ApiImplicitParam(name = "username", value = "用户名", required = true, dataType = "String")
+   @GetMapping("/users/code")
+   public Result<?> sendCode(String username) {
+       userAuthService.sendCode(username);
+       return Result.ok();
+   }
+   ```
+
+#### 拦截
+
+1. 自定义限流拦截器`AccessLimitHandler`
+
+   ```java
+   /**
+    * @author: ladidol
+    * @date: 2022/11/28 12:25
+    * @description: 限流拦截器
+    */
+   @Log4j2
+   public class AccessLimitHandler implements HandlerInterceptor {
+       @Autowired
+       private RedisService redisService;
+   
+       @Override
+       public boolean preHandle(HttpServletRequest httpServletRequest, HttpServletResponse httpServletResponse, Object handler) throws Exception {
+           // 如果请求输入方法
+           if (handler instanceof HandlerMethod) {
+               HandlerMethod hm = (HandlerMethod) handler;
+               // 获取方法中的注解,看是否有该注解
+               AccessLimit accessLimit = hm.getMethodAnnotation(AccessLimit.class);
+               if (accessLimit != null) {
+                   long seconds = accessLimit.seconds();
+                   int maxCount = accessLimit.maxCount();
+                   // 关于key的生成规则可以自己定义 本项目需求是对每个方法都加上限流功能，如果你只是针对ip地址限流，那么key只需要只用ip就好
+                   String key = IpUtils.getIpAddress(httpServletRequest) + hm.getMethod().getName();
+                   // 从redis中获取用户访问的次数
+                   try {
+                       // 此操作代表获取该key对应的值自增1后的结果
+                       long q = redisService.incrExpire(key, seconds);
+                       if (q > maxCount) {
+                           render(httpServletResponse, Result.fail("请求过于频繁，请稍候再试"));
+                           log.warn(key + "请求次数超过每" + seconds + "秒" + maxCount + "次");
+                           return false;
+                       }
+                       return true;
+                   } catch (RedisConnectionFailureException e) {
+                       log.warn("redis错误: " + e.getMessage());
+                       return false;
+                   }
+               }
+           }
+           return true;
+       }
+   
+       /**
+        * 作者：Ladidol
+        * 描述：将不通过的结果返回给前端
+        */
+       private void render(HttpServletResponse response, Result<?> result) throws Exception {
+           response.setContentType(APPLICATION_JSON);
+           OutputStream out = response.getOutputStream();
+           String str = JSON.toJSONString(result);
+           out.write(str.getBytes(StandardCharsets.UTF_8));
+           out.flush();
+           out.close();
+       }
+   
+   }
+   ```
+
+2. 在`WebMvcConfigurer`的实现类中注册拦截器
+
+   ```java
+   /** <p>
+       * 作者：Ladidol
+       * 描述：WebMvc注册拦截器
+       */
+       @Override
+       public void addInterceptors(InterceptorRegistry registry) {
+   
+       //注册限流拦截器
+       registry.addInterceptor(getAccessLimitHandler());
+   }
+   ```
+
+### 分页拦截器
+
+#### 准备
+
+1. 准备一个分页工具类
+
+   ```java
+   /**
+    * @author: ladidol
+    * @date: 2022/11/28 12:49
+    * @description: 分页工具类
+    */
+   public class PageUtils {
+   
+       //ThreadLocal，线程的局部变量，只有当前线程能访问，这里就表示只有当前请求才能访问的
+       private static final ThreadLocal<Page<?>> PAGE_HOLDER = new ThreadLocal<>();
+   
+       public static void setCurrentPage(Page<?> page) {
+           PAGE_HOLDER.set(page);
+       }
+   
+       public static Page<?> getPage() {
+           Page<?> page = PAGE_HOLDER.get();
+           if (Objects.isNull(page)) {
+               setCurrentPage(new Page<>());
+           }
+           return PAGE_HOLDER.get();
+       }
+   
+       public static Long getCurrent() {
+           return getPage().getCurrent();
+       }
+   
+       public static Long getSize() {
+           return getPage().getSize();
+       }
+   
+       public static Long getLimitCurrent() {
+           return (getCurrent() - 1) * getSize();
+       }
+   
+       public static void remove() {
+           PAGE_HOLDER.remove();
+       }
+   
+   }
+   ```
+
+2. 值得注意的是，这里的用`ThreadLocal`来保存页面变量，使用范围只是当前线程：这里就是当前请求这段时间
+
+   ```java
+   //ThreadLocal，线程的局部变量，只有当前线程能访问，这里就表示只有当前请求才能访问的
+   private static final ThreadLocal<Page<?>> PAGE_HOLDER = new ThreadLocal<>();
+   ```
+
+3. 然后在准备一个`PageResult.java`，用于给前端返回当前页的数据，和当前页的个数，可以拓展，看前端具体要什么。
+
+   ```java
+   /**
+    * @author: ladidol
+    * @date: 2022/11/28 13:15
+    * @description: 分页对象
+    */
+   @Data
+   @AllArgsConstructor
+   @NoArgsConstructor
+   @Builder
+   @ApiModel(description = "分页对象")
+   public class PageResult<T> {
+   
+       /**
+        * 分页列表
+        */
+       @ApiModelProperty(name = "recordList", value = "分页列表", required = true, dataType = "List<T>")
+       private List<T> recordList;
+   
+       /**
+        * 总数
+        */
+       @ApiModelProperty(name = "count", value = "总数", required = true, dataType = "Integer")
+       private Integer count;
+   
+   }
+   
+   ```
+
+   
+
+
+
+#### 拦截
+
+1. 主要通过拦截看一下前端有没有传参数current和size，这两个表示要分页，这时候就新建一个页面等待分页。所以说拦截器的主要功能就是定义页面大小和当前页`setCurrentPage`，存入`PageUtils`中的局部变量中去，供工具类`PageUtils`使用。
+
+2. 先实现一个拦截器：
+
+   ```java
+   /**
+    * @author: ladidol
+    * @date: 2022/11/28 12:46
+    * @description: 分页拦截器，根据请求处理是否分页
+    */
+   public class PageableHandlerInterceptor implements HandlerInterceptor {
+   
+       @Override
+       public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
+           String currentPage = request.getParameter(CURRENT);
+           String pageSize = Optional.ofNullable(request.getParameter(SIZE)).orElse(DEFAULT_SIZE);
+           if (!StringUtils.isNullOrEmpty(currentPage)) {
+               PageUtils.setCurrentPage(new Page<>(Long.parseLong(currentPage), Long.parseLong(pageSize)));
+           }
+           return true;
+       }
+   
+       @Override
+       public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) {
+           PageUtils.remove();
+       }
+   
+   }
+   ```
+
+3. 注册拦截器：
+
+   ```java
+   /**
+        * <p>
+        * 作者：Ladidol
+        * 描述：WebMvc注册拦截器
+        */
+   @Override
+   public void addInterceptors(InterceptorRegistry registry) {
+   
+       //注册分页拦截器
+       registry.addInterceptor(new PageableHandlerInterceptor());
+   
+   }
+   ```
+
+   
+
+### 自定义操作日记注解
+
+#### 准备
+
+1. 自定一个注解`@OptLog`
+
+   ```java
+   /**
+    * @author: ladidol
+    * @date: 2022/11/28 15:00
+    * @description: 操作日志注解
+    */
+   @Target(ElementType.METHOD)
+   @Retention(RetentionPolicy.RUNTIME)
+   @Documented
+   public @interface OptLog {
+   
+       /**
+        * @return 操作类型
+        */
+       String optType() default "";
+   
+   }
+   ```
+
+2. 操作日志持久化多层准备：
+
+   持久化类：
+
+   ```java
+   @Data
+   @Builder
+   @AllArgsConstructor
+   @NoArgsConstructor
+   @TableName("tb_operation_log")
+   public class OperationLog {
+   
+       /**
+        * 日志id
+        */
+       @TableId(value = "id", type = IdType.AUTO)
+       private Integer id;
+   
+       /**
+        * 操作模块
+        */
+       private String optModule;
+   
+       /**
+        * 操作路径
+        */
+       private String optUrl;
+   
+       /**
+        * 操作类型
+        */
+       private String optType;
+   
+       /**
+        * 操作方法
+        */
+       private String optMethod;
+   
+       /**
+        * 操作描述
+        */
+       private String optDesc;
+   
+       /**
+        * 请求方式
+        */
+       private String requestMethod;
+   
+       /**
+        * 请求参数
+        */
+       private String requestParam;
+   
+       /**
+        * 返回数据
+        */
+       private String responseData;
+   
+       /**
+        * 用户id
+        */
+       private Integer userId;
+   
+       /**
+        * 用户昵称
+        */
+       private String nickname;
+   
+       /**
+        * 用户登录ip
+        */
+       private String ipAddress;
+   
+       /**
+        * ip来源
+        */
+       private String ipSource;
+   
+       /**
+        * 创建时间
+        */
+       @TableField(fill = FieldFill.INSERT)
+       private LocalDateTime createTime;
+   
+       /**
+        * 修改时间
+        */
+       @TableField(fill = FieldFill.UPDATE)
+       private LocalDateTime updateTime;
+   
+   }
+   ```
+
+   mapper层：
+
+   ```java
+   @Repository
+   public interface OperationLogMapper extends BaseMapper<OperationLog> {
+   }
+   ```
+
+3. 准备一个操作日志常量类：
+
+   ```java
+   /**
+    * @author: ladidol
+    * @date: 2022/11/28 14:33
+    * @description: 操作日志类型常量
+    */
+   public class OptTypeConst {
+   
+       /**
+        * 新增操作
+        */
+       public static final String SAVE_OR_UPDATE = "新增或修改";
+   
+       /**
+        * 新增
+        */
+       public static final String SAVE = "新增";
+   
+       /**
+        * 修改操作
+        */
+       public static final String UPDATE = "修改";
+   
+       /**
+        * 删除操作
+        */
+       public static final String REMOVE = "删除";
+   
+       /**
+        * 上传操作
+        */
+       public static final String UPLOAD = "上传";
+   
+   }
+   ```
+
+   
+
+4. 将你需要记录操作日志的接口放上这个注解：
+
+   ```java
+   /**
+        * 保存或更新角色
+        *
+        * @param roleVO 角色信息
+        * @return {@link Result<>}
+        */
+   @OptLog(optType = SAVE_OR_UPDATE)
+   @ApiOperation(value = "保存或更新角色")
+   @PostMapping("/admin/role")
+   public Result<?> saveOrUpdateRole(@RequestBody @Valid RoleVO roleVO) {
+       roleService.saveOrUpdateRole(roleVO);
+       return Result.ok();
+   }
+   
+   ```
+
+   
+
+#### 切面处理
+
+1. 新建一个切面
+
+   ```java
+   @Aspect
+   @Component
+   public class OptLogAspect {
+   ```
+
+2. 设置操作日志切入点 记录操作日志 在注解的位置切入代码
+
+   ```java
+   /**
+        * 设置操作日志切入点 记录操作日志 在注解的位置切入代码
+        */
+   @Pointcut("@annotation(org.cuit.epoch.annotation.OptLog)")
+   public void optLogPointCut() {}
+   ```
+
+3. 正常返回通知，拦截用户操作日志，连接点正常执行完成后执行， 如果连接点抛出异常，则不会执行
+
+   ```java
+   /**
+        * 正常返回通知，拦截用户操作日志，连接点正常执行完成后执行， 如果连接点抛出异常，则不会执行
+        *
+        * @param joinPoint 切入点
+        * @param keys      返回结果
+        */
+   @AfterReturning(value = "optLogPointCut()", returning = "keys")
+   @SuppressWarnings("unchecked")
+   public void saveOptLog(JoinPoint joinPoint, Object keys) {
+       // 获取RequestAttributes
+       RequestAttributes requestAttributes = RequestContextHolder.getRequestAttributes();
+       // 从获取RequestAttributes中获取HttpServletRequest的信息
+       HttpServletRequest request = (HttpServletRequest) Objects.requireNonNull(requestAttributes).resolveReference(RequestAttributes.REFERENCE_REQUEST);
+       OperationLog operationLog = new OperationLog();
+       // 从切面织入点处通过反射机制获取织入点处的方法
+       MethodSignature signature = (MethodSignature) joinPoint.getSignature();
+       // 获取切入点所在的方法
+       Method method = signature.getMethod();
+       // 获取操作
+       Api api = (Api) signature.getDeclaringType().getAnnotation(Api.class);
+       ApiOperation apiOperation = method.getAnnotation(ApiOperation.class);
+       OptLog optLog = method.getAnnotation(OptLog.class);
+       // 操作模块
+       operationLog.setOptModule(api.tags()[0]);
+       // 操作类型
+       operationLog.setOptType(optLog.optType());
+       // 操作描述
+       operationLog.setOptDesc(apiOperation.value());
+       // 获取请求的类名
+       String className = joinPoint.getTarget().getClass().getName();
+       // 获取请求的方法名
+       String methodName = method.getName();
+       methodName = className + "." + methodName;
+       // 请求方式
+       operationLog.setRequestMethod(Objects.requireNonNull(request).getMethod());
+       // 请求方法
+       operationLog.setOptMethod(methodName);
+       // 请求参数
+       operationLog.setRequestParam(JSON.toJSONString(joinPoint.getArgs()));
+       // 返回结果
+       operationLog.setResponseData(JSON.toJSONString(keys));
+       // 请求用户ID
+       operationLog.setUserId(StpUtil.getLoginIdAsInt());
+       // 请求用户
+       UserDetailDTO userDetailDTO = (UserDetailDTO) StpUtil.getSession().get(USER_INFO);
+       operationLog.setNickname(userDetailDTO.getNickname());
+       // 请求IP
+       String ipAddress = IpUtils.getIpAddress(request);
+       operationLog.setIpAddress(ipAddress);
+       operationLog.setIpSource(IpUtils.getIpSource(ipAddress));
+       // 请求URL
+       operationLog.setOptUrl(request.getRequestURI());
+       operationLogMapper.insert(operationLog);
+   }
+   ```
+
+   
+
+
+
+
 
 
 
@@ -1201,3 +1735,248 @@ keywords关键字，这里用ConditionVo类来封装。
    ```
 
    
+
+## 用户角色模块
+
+### 1）查询全部用户角色
+
+#### 参数
+
+无。
+
+#### 简介
+
+直接查询role表，得到全部的角色+角色id，这个接口主要用于给用户添加角色时查询roleId用的。
+
+#### 实现细节
+
+1. 直接查询id和roleName
+
+   ```java
+   // 查询角色列表
+   List<Role> roleList = roleMapper.selectList(new LambdaQueryWrapper<Role>()
+                                               .select(Role::getId, Role::getRoleName));
+   return BeanCopyUtils.copyList(roleList, UserRoleDTO.class);
+   ```
+
+2. 依旧巧妙地使用了`BeanCopyUtils.copyList`。
+
+### 2）分页查询角色列表
+
+#### 参数
+
+封装在ConditionVO中的current和size
+
+#### 简介
+
+通过传入当前页和页面大小，来进行分页查询
+
+#### 实现细节
+
+1. 查询角色列表，这里可以直接查询到每一个角色所拥有的资源和菜单列表：这里通过mapper层自定义的方法`listRoles`来实现
+
+   ```java
+   // 查询角色列表，这里可以直接查询到每一个角色所拥有的资源和菜单列表
+   List<RoleDTO> roleDTOList = roleMapper.listRoles(PageUtils.getLimitCurrent(), PageUtils.getSize(), conditionVO);
+   ```
+
+   mapper层：
+
+   ```xml
+   <resultMap id="RoleMap" type="org.cuit.epoch.dto.RoleDTO">
+       <id column="id" property="id"/>
+       <result column="role_name" property="roleName"/>
+       <result column="role_label" property="roleLabel"/>
+       <result column="create_time" property="createTime"/>
+       <result column="is_disable" property="isDisable"/>
+       <collection property="resourceIdList" ofType="java.lang.Integer">
+       <constructor>
+       <arg column="resource_id"/>
+       </constructor>
+       </collection>
+       <collection property="menuIdList" ofType="java.lang.Integer">
+       <constructor>
+       <arg column="menu_id"/>
+       </constructor>
+       </collection>
+       
+   </resultMap>
+   <select id="listRoles" resultMap="RoleMap">
+           SELECT
+           r.id,
+           role_name,
+           role_label,
+           r.create_time,
+           r.is_disable,
+           rr.resource_id,
+           rm.menu_id
+           FROM
+           (
+           SELECT
+           id,
+           role_name,
+           role_label,
+           create_time,
+           is_disable
+           FROM
+           tb_role
+           <where>
+               <if test="conditionVO.keywords != null ">
+                   role_name like concat('%',#{conditionVO.keywords},'%')
+               </if>
+           </where>
+           LIMIT #{current}, #{size}
+           ) r
+           LEFT JOIN tb_role_resource rr ON r.id = rr.role_id
+           LEFT JOIN tb_role_menu rm on r.id = rm.role_id
+           ORDER BY r.id
+   </select>
+   ```
+
+#### 注意
+
+值得提一嘴的是，这个接口是查询到每一个角色所拥有的资源和菜单列表，需要配合资源模块中的`查询全部角色的资源列表`和菜单模块中的`查询全部角色菜单列表`使用，这样才能达到前端展示的效果![image-20221128142429742](https://figurebed-ladidol.oss-cn-chengdu.aliyuncs.com/img/202211281424020.png)
+
+
+
+### 3）保存或更新角色信息
+
+#### 参数
+
+```json
+{
+  "id": {保存操作时可以为null，更新操作的时候这里就需要id不为空了},
+  "menuIdList": {需要添加或者更新的菜单id列表},
+  "resourceIdList": {需要更新的菜单列表},
+  "roleLabel": {标签},
+  "roleName": {角色名}
+}
+```
+
+
+
+#### 简介
+
+保存和更新角色信息共用的一个接口。
+
+#### 实现细节
+
+1. 先判断用户名是不是重复，**值得注意**的是如果是第一次保存角色的话，roleName相同，就会报错，如果是更改角色信息的话，这里因为id相同而不会报错！
+
+   ```java
+   // 判断角色名重复
+   Role existRole = roleMapper.selectOne(new LambdaQueryWrapper<Role>()
+                                         .select(Role::getId)
+                                         .eq(Role::getRoleName, roleVO.getRoleName()));
+   if (Objects.nonNull(existRole) && !existRole.getId().equals(roleVO.getId())) {
+       throw new AppException("角色名已存在");
+   }
+   ```
+
+2. 构建一个entity对象，保存或者更新角色信息：
+
+   ```java
+   // 保存或更新角色信息
+   Role role = Role.builder()
+       .id(roleVO.getId())
+       .roleName(roleVO.getRoleName())
+       .roleLabel(roleVO.getRoleLabel())
+       .isDisable(CommonConst.FALSE)
+       .build();
+   this.saveOrUpdate(role);//自动填充roleId
+   ```
+
+3. 对于resourceIdList和menusIdList，我们需要分别更新角色绑定表；
+
+4. 更新角色资源表：先删除该角色的全部资源绑定---》再添加该角色的资源绑定
+
+   ```java
+   // 更新角色资源关系
+   if (Objects.nonNull(roleVO.getResourceIdList())) {
+       //先删除表中关于这个角色的全部资源绑定
+       if (Objects.nonNull(roleVO.getId())) {
+           roleResourceService.remove(new LambdaQueryWrapper<RoleResource>()
+                                      .eq(RoleResource::getRoleId, roleVO.getId()));
+       }
+       //再添加这个角色的资源绑定
+       List<RoleResource> roleResourceList = roleVO.getResourceIdList().stream()
+           .map(resourceId -> RoleResource.builder()
+                .roleId(role.getId())
+                .resourceId(resourceId)
+                .build())
+           .collect(Collectors.toList());
+       roleResourceService.saveBatch(roleResourceList);
+       // 重新加载角色资源信息
+       mySourceSafilterAuthStrategy.clearDataSource();
+   }
+   ```
+
+5. 更新角色菜单表：先删除该角色的全部菜单绑定---》再添加该角色的菜单绑定
+
+   ```java
+   // 更新角色菜单关系
+   if (Objects.nonNull(roleVO.getMenuIdList())) {
+       if (Objects.nonNull(roleVO.getId())) {
+           roleMenuService.remove(new LambdaQueryWrapper<RoleMenu>().eq(RoleMenu::getRoleId, roleVO.getId()));
+       }
+       List<RoleMenu> roleMenuList = roleVO.getMenuIdList().stream()
+           .map(menuId -> RoleMenu.builder()
+                .roleId(role.getId())
+                .menuId(menuId)
+                .build())
+           .collect(Collectors.toList());
+       roleMenuService.saveBatch(roleMenuList);
+   }
+   ```
+
+6. 这个接口的操作我们需要用日志来记录，这里通过自定义注解`@OptLog`来
+
+   ```java
+   @OptLog(optType = SAVE_OR_UPDATE)
+   @ApiOperation(value = "保存或更新角色")
+   @PostMapping("/admin/role")
+   public Result<?> saveOrUpdateRole(@RequestBody @Valid RoleVO roleVO) {
+       roleService.saveOrUpdateRole(roleVO);
+       return Result.ok();
+   }
+   ```
+
+   
+
+#### 注意
+
+1. 依旧是使用流来代替for循环操作
+2. 这里对于资源绑定的不同，我们没有直接对比添加，而是先删除以前的资源绑定，再添加现在的资源绑定，这样想来实现也挺简单的。
+
+### 4）删除角色
+
+#### 参数
+
+传入id链表
+
+
+
+#### 简介
+
+前端传入id链表，可以直接进行批量删除
+
+#### 实现细节
+
+1. 先判断该角色下有没有其他用户绑定着
+
+   ```java
+   // 判断角色下是否有用户
+   Integer count = userRoleDao.selectCount(new LambdaQueryWrapper<UserRole>()
+                                           .in(UserRole::getRoleId, roleIdList));
+   if (count > 0) {
+       throw new AppException("该角色下存在用户");
+   }
+   ```
+
+2. 直接删除就行啦！
+
+   ```java
+   roleMapper.deleteBatchIds(roleIdList);
+   ```
+
+3. 该操作也是需要操作日志持久化一下的：`@OptLog(optType = REMOVE)`

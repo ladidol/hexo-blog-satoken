@@ -28,7 +28,7 @@ import java.util.List;
 public class MySourceSafilterAuthStrategy implements SaFilterAuthStrategy {
 
     /**
-     * 资源角色列表
+     * 资源角色列表，用static能直接更改静态属性，以至于可以在类里面使用
      */
     private static List<ResourceRoleDTO> resourceRoleList;
 

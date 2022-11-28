@@ -1,4 +1,4 @@
-package org.cuit.epoch.dto.menu;
+package org.cuit.epoch.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

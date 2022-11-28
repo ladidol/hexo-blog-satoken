@@ -1,7 +1,7 @@
 package org.cuit.epoch.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
-import org.cuit.epoch.dto.menu.LabelOptionDTO;
+import org.cuit.epoch.dto.LabelOptionDTO;
 import org.cuit.epoch.dto.resource.ResourceDTO;
 import org.cuit.epoch.entity.Resource;
 import org.cuit.epoch.vo.ConditionVO;

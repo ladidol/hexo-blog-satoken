@@ -28,12 +28,12 @@ public class CommonConst {
     public static final String POST_TAG = "</span>";
 
     /**
-     * 当前页码
+     * 当前页码，前端传的参数，通过request获取
      */
     public static final String CURRENT = "current";
 
     /**
-     * 页码条数
+     * 页码条数，前端传的参数，通过request获取
      */
     public static final String SIZE = "size";
 

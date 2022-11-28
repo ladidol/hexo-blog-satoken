@@ -3,7 +3,7 @@ package org.cuit.epoch.controller;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
-import org.cuit.epoch.dto.menu.LabelOptionDTO;
+import org.cuit.epoch.dto.LabelOptionDTO;
 import org.cuit.epoch.dto.menu.MenuDTO;
 import org.cuit.epoch.dto.menu.UserMenuDTO;
 import org.cuit.epoch.service.MenuService;
@@ -75,8 +75,7 @@ public class MenuController {
     @GetMapping("/admin/role/menus")
     public Result<List<LabelOptionDTO>> listMenuOptions() {
         List<LabelOptionDTO> labelOptionDTOS = menuService.listMenuOptions();
-        log.info("labelOptionDTOS = " + labelOptionDTOS);
-        return Result.ok();
+        return Result.ok(labelOptionDTOS);
     }
 
     /**

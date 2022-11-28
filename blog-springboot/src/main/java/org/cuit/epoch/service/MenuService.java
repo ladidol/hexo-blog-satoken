@@ -1,7 +1,7 @@
 package org.cuit.epoch.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
-import org.cuit.epoch.dto.menu.LabelOptionDTO;
+import org.cuit.epoch.dto.LabelOptionDTO;
 import org.cuit.epoch.dto.menu.MenuDTO;
 import org.cuit.epoch.dto.menu.UserMenuDTO;
 import org.cuit.epoch.entity.Menu;

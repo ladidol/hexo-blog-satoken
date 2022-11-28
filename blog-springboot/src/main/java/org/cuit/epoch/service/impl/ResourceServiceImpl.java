@@ -5,7 +5,7 @@ import com.baomidou.mybatisplus.core.toolkit.CollectionUtils;
 import com.baomidou.mybatisplus.core.toolkit.StringUtils;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import lombok.extern.slf4j.Slf4j;
-import org.cuit.epoch.dto.menu.LabelOptionDTO;
+import org.cuit.epoch.dto.LabelOptionDTO;
 import org.cuit.epoch.dto.resource.ResourceDTO;
 import org.cuit.epoch.entity.Resource;
 import org.cuit.epoch.entity.RoleResource;

@@ -1,4 +1,4 @@
-package org.cuit.epoch.satoken;
+package org.cuit.epoch.config.satoken;
 
 import cn.dev33.satoken.context.SaHolder;
 import cn.dev33.satoken.filter.SaServletFilter;
@@ -8,11 +8,14 @@ import cn.dev33.satoken.stp.StpUtil;
 import cn.dev33.satoken.util.SaResult;
 import lombok.extern.slf4j.Slf4j;
 import org.cuit.epoch.exception.AppException;
+import org.cuit.epoch.handler.AccessLimitHandler;
 import org.cuit.epoch.handler.MySourceSafilterAuthStrategy;
+import org.cuit.epoch.handler.PageableHandlerInterceptor;
 import org.cuit.epoch.util.Result;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
@@ -21,14 +24,12 @@ import javax.servlet.http.HttpServletRequest;
 
 
 /**
- * [Sa-Token 权限认证] 配置类
- * 详细配置可以看这个：https://sa-token.dev33.cn/doc.html#/use/route-check
- *
- * @author kong
+ * web mvc配置
+ * @author ladidol
  */
 @Configuration
 @Slf4j
-public class SaTokenConfigure implements WebMvcConfigurer {
+public class XiaoXiaoConfig implements WebMvcConfigurer {
 
 
     @Resource
@@ -38,13 +39,42 @@ public class SaTokenConfigure implements WebMvcConfigurer {
     MySourceSafilterAuthStrategy mySourceSafilterAuthStrategy;
 
 
+    @Bean
+    public AccessLimitHandler getAccessLimitHandler() {
+        //限流拦截器
+        return new AccessLimitHandler();
+    }
+
+    /**
+     * 作者：Ladidol
+     * 描述：允许跨域
+     */
+    @Override
+    public void addCorsMappings(CorsRegistry registry) {
+        registry.addMapping("/**")
+                .allowCredentials(true)
+                .allowedHeaders("*")
+                .allowedOriginPatterns("*")
+                .allowedMethods("*");
+    }
+
     /**
      * 注册 [Sa-Token 拦截器]
      * DispatcherServlet 之后
+     * Sa-Token详细配置可以看这个：https://sa-token.dev33.cn/doc.html#/use/route-checkWebMvc
+     *
+     * <p>
+     * 作者：Ladidol
+     * 描述：WebMvc注册拦截器
      */
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
-        // 注册路由拦截器，自定义认证规则
+
+        //注册限流拦截器
+        registry.addInterceptor(getAccessLimitHandler());
+        //注册分页拦截器
+        registry.addInterceptor(new PageableHandlerInterceptor());
+        //注册路由拦截器，自定义认证规则
         registry.addInterceptor(new SaInterceptor(handler -> {
 
             // 登录校验 -- 拦截所有路由，并排除/user/doLogin 用于开放登录
@@ -82,10 +112,10 @@ public class SaTokenConfigure implements WebMvcConfigurer {
                     // 2022/11/18 这里就是用户权限不足的时候
                     log.info(e.getMessage());
                     e.printStackTrace();
-                    if (e instanceof AppException){
+                    if (e instanceof AppException) {
                         return Result.fail(e.getMessage());
                     }
-                    return Result.fail(e.getMessage()+"：用户未登录");
+                    return Result.fail(e.getMessage() + "：用户未登录");
                 })
 
                 // 前置函数：在每次认证函数之前执行

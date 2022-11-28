@@ -27,7 +27,7 @@ public class UserAuthController {
 
     /**
      * 发送邮箱验证码
-     *
+     * 60秒限制只发送一次邮箱验证码
      * @param username 用户名
      * @return {@link Result<>}
      */

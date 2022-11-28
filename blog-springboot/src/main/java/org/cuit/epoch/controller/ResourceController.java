@@ -2,7 +2,7 @@ package org.cuit.epoch.controller;
 
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
-import org.cuit.epoch.dto.menu.LabelOptionDTO;
+import org.cuit.epoch.dto.LabelOptionDTO;
 import org.cuit.epoch.dto.resource.ResourceDTO;
 import org.cuit.epoch.service.ResourceService;
 import org.cuit.epoch.util.Result;

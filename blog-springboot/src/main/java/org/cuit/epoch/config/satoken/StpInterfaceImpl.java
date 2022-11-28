@@ -1,4 +1,4 @@
-package org.cuit.epoch.satoken;
+package org.cuit.epoch.config.satoken;
 
 import cn.dev33.satoken.stp.StpInterface;
 import cn.dev33.satoken.stp.StpUtil;
