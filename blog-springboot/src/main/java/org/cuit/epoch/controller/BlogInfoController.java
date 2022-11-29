@@ -1,19 +1,13 @@
 package org.cuit.epoch.controller;
 
-import cn.dev33.satoken.annotation.SaCheckLogin;
-import cn.dev33.satoken.annotation.SaCheckRole;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
-import org.cuit.epoch.dto.BlogHomeInfoDTO;
+import org.cuit.epoch.dto.blog.BlogHomeInfoDTO;
 import org.cuit.epoch.service.BlogInfoService;
 import org.cuit.epoch.util.Result;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
-
-import javax.validation.Valid;
 
 /**
  * @author: ladidol
@@ -51,7 +45,7 @@ public class BlogInfoController {
 //    public Result<BlogBackInfoDTO> getBlogBackInfo() {
 //        return Result.ok(blogInfoService.getBlogBackInfo());
 //    }
-//
+
 //    /**
 //     * 上传博客配置图片
 //     *

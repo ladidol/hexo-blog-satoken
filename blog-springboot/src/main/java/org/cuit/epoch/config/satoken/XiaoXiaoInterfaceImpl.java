@@ -16,7 +16,7 @@ import static org.cuit.epoch.enums.RedisPrefixConst.USER_ROLE;
  * 自定义权限验证接口扩展
  */
 @Component    // 打开此注解，保证此类被springboot扫描，即可完成sa-token的自定义权限验证扩展
-public class StpInterfaceImpl implements StpInterface {
+public class XiaoXiaoInterfaceImpl implements StpInterface {
 
 
     @Autowired

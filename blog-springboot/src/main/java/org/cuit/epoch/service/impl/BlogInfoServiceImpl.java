@@ -2,7 +2,7 @@ package org.cuit.epoch.service.impl;
 
 import com.alibaba.fastjson.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import org.cuit.epoch.dto.BlogHomeInfoDTO;
+import org.cuit.epoch.dto.blog.BlogHomeInfoDTO;
 import org.cuit.epoch.entity.Article;
 import org.cuit.epoch.mapper.*;
 import org.cuit.epoch.service.BlogInfoService;

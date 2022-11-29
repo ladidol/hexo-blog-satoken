@@ -6,6 +6,7 @@ import cn.dev33.satoken.interceptor.SaInterceptor;
 import cn.dev33.satoken.router.SaRouter;
 import cn.dev33.satoken.stp.StpUtil;
 import cn.dev33.satoken.util.SaResult;
+import com.alibaba.fastjson.JSON;
 import lombok.extern.slf4j.Slf4j;
 import org.cuit.epoch.exception.AppException;
 import org.cuit.epoch.handler.AccessLimitHandler;
@@ -25,6 +26,7 @@ import javax.servlet.http.HttpServletRequest;
 
 /**
  * web mvc配置
+ *
  * @author ladidol
  */
 @Configuration
@@ -110,12 +112,14 @@ public class XiaoXiaoConfig implements WebMvcConfigurer {
                 // 异常处理函数：每次认证函数发生异常时执行此函数
                 .setError(e -> {
                     // 2022/11/18 这里就是用户权限不足的时候
+                    // 2022/11/29 这里没有返回正确的值，result这里似乎不是json了 ：Result(flag=false, code=51000, message=未能读取到有效Token：用户未登录, data=null)
+                    // 只需要加上一个JSON.toJSONString()就行了
                     log.info(e.getMessage());
                     e.printStackTrace();
                     if (e instanceof AppException) {
-                        return Result.fail(e.getMessage());
+                        return JSON.toJSONString(Result.fail(e.getMessage()));
                     }
-                    return Result.fail(e.getMessage() + "：用户未登录");
+                    return JSON.toJSONString(Result.fail(e.getMessage() + "：用户未登录"));
                 })
 
                 // 前置函数：在每次认证函数之前执行

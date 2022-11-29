@@ -1,4 +1,4 @@
-package org.cuit.epoch.dto;
+package org.cuit.epoch.dto.blog;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

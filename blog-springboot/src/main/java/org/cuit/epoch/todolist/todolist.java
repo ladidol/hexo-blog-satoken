@@ -44,7 +44,7 @@ public class todolist {
     // 2022/11/17 重写一下Security的passwordEcoder方法。bingo
     // TODO: 2022/11/22 这里可以将登录信息放到Sa-token中管理，原先的登录和第三方登录都可以
     // TODO: 2022/11/25 需要根据这个博客来改一下vue前端中的一些配置https://www.talkxj.com/articles/3 ,/public/index.html中
-
+    // TODO: 2022/11/29 后台非admin登录前端弹窗报错信息不正确（没有正确显示）
 
 
 

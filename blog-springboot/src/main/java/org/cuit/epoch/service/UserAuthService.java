@@ -1,11 +1,18 @@
 package org.cuit.epoch.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
+import org.cuit.epoch.dto.UserAreaDTO;
+import org.cuit.epoch.dto.UserBackDTO;
 import org.cuit.epoch.dto.UserDetailDTO;
 import org.cuit.epoch.dto.UserInfoDTO;
 import org.cuit.epoch.entity.UserAuth;
+import org.cuit.epoch.vo.ConditionVO;
+import org.cuit.epoch.vo.PasswordVO;
 import org.cuit.epoch.vo.UserVO;
+import org.cuit.epoch.vo.page.PageResult;
 import org.cuit.epoch.vo.strategy.login.WeiboLoginVO;
+
+import java.util.List;
 
 /**
  * @author: ladidol
@@ -36,14 +43,14 @@ public interface UserAuthService extends IService<UserAuth> {
      * @param username 邮箱号
      */
     void sendCode(String username);
-//
-//    /**
-//     * 获取用户区域分布
-//     *
-//     * @param conditionVO 条件签证官
-//     * @return {@link List <UserAreaDTO>} 用户区域分布
-//     */
-//    List<UserAreaDTO> listUserAreas(ConditionVO conditionVO);
+
+    /**
+     * 获取用户区域分布
+     *
+     * @param conditionVO 条件签证官
+     * @return {@link List <UserAreaDTO>} 用户区域分布
+     */
+    List<UserAreaDTO> listUserAreas(ConditionVO conditionVO);
 
     /**
      * 用户注册
@@ -68,26 +75,26 @@ public interface UserAuthService extends IService<UserAuth> {
      */
     UserInfoDTO weiboLogin(WeiboLoginVO weiboLoginVO);
 
-//    /**
-//     * 修改密码
-//     *
-//     * @param user 用户对象
-//     */
-//    void updatePassword(UserVO user);
-//
-//    /**
-//     * 修改管理员密码
-//     *
-//     * @param passwordVO 密码对象
-//     */
-//    void updateAdminPassword(PasswordVO passwordVO);
-//
-//    /**
-//     * 查询后台用户列表
-//     *
-//     * @param condition 条件
-//     * @return 用户列表
-//     */
-//    PageResult<UserBackDTO> listUserBackDTO(ConditionVO condition);
+    /**
+     * 修改密码
+     *
+     * @param user 用户对象
+     */
+    void updatePassword(UserVO user);
+
+    /**
+     * 修改管理员密码
+     *
+     * @param passwordVO 密码对象
+     */
+    void updateAdminPassword(PasswordVO passwordVO);
+
+    /**
+     * 查询后台用户列表
+     *
+     * @param condition 条件
+     * @return 用户列表
+     */
+    PageResult<UserBackDTO> listUserBackDTO(ConditionVO condition);
 
 }

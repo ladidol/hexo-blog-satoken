@@ -1,6 +1,6 @@
 package org.cuit.epoch.service;
 
-import org.cuit.epoch.dto.BlogHomeInfoDTO;
+import org.cuit.epoch.dto.blog.BlogHomeInfoDTO;
 import org.cuit.epoch.vo.WebsiteConfigVO;
 
 /**

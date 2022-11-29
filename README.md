@@ -5,6 +5,8 @@
 
 图形人机验证，这个是暂时使用的原博主的CaptchaAppId=2088053498，具体可以去这里https://main.qcloudimg.com/raw/document/product/pdf/1110_44904_cn.pdf
 
+注意完成开发后要把邮箱验证功能恢复
+
 ## 自定义架构模块
 
 ### 角色权限管理模块
@@ -943,6 +945,8 @@ StpUtil.logout();
 
 通过QQ登录得到的openId
 
+todo，待做
+
 #### 简介
 
 携带QQ登录的到的openId访问该接口
@@ -1018,33 +1022,42 @@ todo
 
 2. 封装用户信息对象、用户角色对象、用户账号对象分别插入数据
 
-```java
-// 校验账号是否合法
-if (checkUser(user)) {
+	```java
+	// 校验账号是否合法
+	if (checkUser(user)) {
     throw new AppException("邮箱已被注册！");
-}
-// 新增用户信息
-UserInfo userInfo = UserInfo.builder()
+	}
+	// 新增用户信息
+	UserInfo userInfo = UserInfo.builder()
     .email(user.getUsername())
     .nickname(CommonConst.DEFAULT_NICKNAME + IdWorker.getId())
     .avatar(blogInfoService.getWebsiteConfig().getUserAvatar())
     .build();
-userInfoMapper.insert(userInfo);
-// 绑定用户角色
-UserRole userRole = UserRole.builder()
+	userInfoMapper.insert(userInfo);
+	// 绑定用户角色
+	UserRole userRole = UserRole.builder()
     .userId(userInfo.getId())
     .roleId(RoleEnum.USER.getRoleId())
     .build();
-userRoleMapper.insert(userRole);
-// 新增用户账号
-UserAuth userAuth = UserAuth.builder()
+	userRoleMapper.insert(userRole);
+	// 新增用户账号
+	UserAuth userAuth = UserAuth.builder()
     .userInfoId(userInfo.getId())
     .username(user.getUsername())
     .password(PasswordUtils.encrypt(user.getPassword()))
     .loginType(LoginTypeEnum.EMAIL.getType())
     .build();
-userAuthMapper.insert(userAuth);
-```
+	userAuthMapper.insert(userAuth);
+	```
+	
+3. 更新一下用户的地区分布情况，该方法也用@Scheduled注解标记为定时方法，详细实现在本模块的第三个接口中会详细介绍
+
+  ```java
+  //更新在redis中用户地区信息
+  statisticalUserArea();
+  ```
+
+  
 
 ### 2）发送邮箱验证码
 
@@ -1088,7 +1101,363 @@ username即邮箱账号
    redisService.set(USER_CODE_KEY + username, code, CODE_EXPIRE_TIME);
    ```
 
+
+
+
+### 3）获取用户区域分布
+
+#### 参数
+
+封装在conditionVO中的type参数
+
+#### 简介
+
+type参数：1表示查询用户的地区分布，2表示查询游客的地区分布
+
+其中游客数据主要来自于游客查看博客等会触发redis更新。
+
+#### 实现细节
+
+1. 用`List<UserAreaDTO>`来返回给前端
+
+2. 用枚举类+switchcase的方式来实现对用户和游客的分别查询：
+
+   ```java
+   switch (Objects.requireNonNull(getUserAreaType(conditionVO.getType()))) {
+           //默认查询用户的
+       case USER_VISITOR:
+           // 查询注册用户区域分布
+           
+   		......
+               
+           return userAreaDTOList;
+       case VISITOR:
+           // 查询游客区域分布
+           
+           ......
+               
+           return userAreaDTOList;
+       default:
+           break;
+   }
+   ```
+
+3. 查询用户：
+
+   ```java
+   //默认查询用户的
+   case USER_VISITOR:
+       // 查询注册用户区域分布
+       Object userArea = redisService.get(USER_AREA);
+       if (Objects.nonNull(userArea)) {
+           userAreaDTOList = JSON.parseObject(userArea.toString(), List.class);
+       }
+       return userAreaDTOList;
+   ```
+
+4. 查询游客：
+
+   ```java
+   case VISITOR:
+       // 查询游客区域分布
+       Map<String, Object> visitorArea = redisService.hGetAll(VISITOR_AREA);
+       if (Objects.nonNull(visitorArea)) {
+           userAreaDTOList = visitorArea.entrySet().stream()
+               .map(item -> UserAreaDTO.builder()
+                    .name(item.getKey())
+                    .value(Long.valueOf(item.getValue().toString()))
+                    .build())
+               .collect(Collectors.toList());
+       }
+       return userAreaDTOList;
+   ```
+
+
+
+### 4）更新redis中用户区域分布情况
+
+#### 参数
+
+无
+
+#### 简介
+
+这只是一个服务，没有提供接口。主要是更新redis中用户区域的分布情况用`RedisPrefixConst.USER_AREA`作为key，将地区和地区出现数量放入value中去。
+
+#### 实现细节
+
+1. 该类使用了定时任务：方便定时更新信息
+
+   ```java
+   /**
+        * 统计用户地区
+        */
+   @Scheduled(cron = "0 0 * * * ?") // [秒] [分] [小时] [日] [月] [周] [年]，问号表示不关心星期几，每天每小时整就会触发一下这个方法
+   public void statisticalUserArea() {
+   ```
+
+2. 先查询用户的账号信息：
+
+   ```java
+   List<UserAuth> userAuths = userAuthMapper.selectList(new LambdaQueryWrapper<UserAuth>().select(UserAuth::getIpSource,UserAuth::getUsername));
    
+   ```
+
+3. 依旧用Stream对userAuths遍历，在计数的同时还处理了一下省份信息：（很帅）
+
+   ```java
+   Map<String, Long> userAreaMap = userAuths
+       .stream()
+       .map(item -> {
+           if (StringUtils.isNotBlank(item.getIpSource())) {
+               return item.getIpSource().substring(0, 2)
+                   .replaceAll(PROVINCE, "")
+                   .replaceAll(CITY, "");
+           }
+           return UNKNOWN;
+       })
+       .collect(Collectors.groupingBy(item -> item, Collectors.counting()));
+   ```
+
+4. 将map的键值形式转化成UserAreaDTO属性：
+
+   ```java
+   // 转换格式
+   List<UserAreaDTO> userAreaList = userAreaMap.entrySet().stream()
+       .map(item -> UserAreaDTO.builder()
+            .name(item.getKey())
+            .count(item.getValue())
+            .build())
+       .collect(Collectors.toList());
+   ```
+
+5. 最后将用户地区统计放到redis中
+
+   ```java
+   redisService.set(USER_AREA, JSON.toJSONString(userAreaList));
+   ```
+
+### 5）查询后台用户列表
+
+#### 参数
+
+页码和页面大小
+
+#### 简介
+
+通过分页查询后台用户列表。
+
+#### 实现细节
+
+1. 先获取用户总数量
+
+   ```java
+   // 获取后台用户数量
+   Integer count = userAuthMapper.countUser(condition);
+   if (count == 0) {
+       return new PageResult<>();
+   }
+   ```
+
+   mapper层
+
+   ```java
+   /**
+        * 查询后台用户数量
+        *
+        * @param condition 条件
+        * @return 用户数量
+        */
+   Integer countUser(@Param("condition") ConditionVO condition);
+   ```
+
+   ```xml
+   <select id="countUser" resultType="java.lang.Integer">
+       SELECT
+       count( 1 )
+       FROM
+       tb_user_auth ua
+       LEFT JOIN tb_user_info ui ON ua.user_info_id = ui.id
+       <where>
+           <if test="condition.keywords != null">
+               nickname like concat('%',#{condition.keywords},'%')
+           </if>
+           <if test="condition.loginType != null">
+               and login_type = #{condition.loginType}
+           </if>
+       </where>
+   </select>
+   ```
+
+2. 再获取全部后台用户列表
+
+   ```java
+   // 获取后台用户列表
+   List<UserBackDTO> userBackDTOList = userAuthMapper.listUsers(PageUtils.getLimitCurrent(), PageUtils.getSize(), condition);
+   return new PageResult<>(userBackDTOList, count);
+   ```
+
+   mapper层：
+
+   ```java
+   /**
+        * 查询后台用户列表
+        *
+        * @param current   页码
+        * @param size      大小
+        * @param condition 条件
+        * @return {@link List <UserBackDTO>} 用户列表
+        */
+   List<UserBackDTO> listUsers(@Param("current") Long current, @Param("size") Long size, @Param("condition") ConditionVO condition);
+   
+   ```
+
+   ```xml
+   <resultMap id="UserBackMap" type="org.cuit.epoch.dto.UserBackDTO">
+       <id column="id" property="id"/>
+       <result column="user_info_id" property="userInfoId"/>
+       <result column="avatar" property="avatar"/>
+       <result column="nickname" property="nickname"/>
+       <result column="login_type" property="loginType"/>
+       <result column="ip_address" property="ipAddress"/>
+       <result column="ip_source" property="ipSource"/>
+       <result column="create_time" property="createTime"/>
+       <result column="last_login_time" property="lastLoginTime"/>
+       <result column="is_disable" property="isDisable"/>
+       <collection property="roleList" ofType="org.cuit.epoch.dto.UserRoleDTO">
+           <id column="role_id" property="id"/>
+           <id column="role_name" property="roleName"/>
+       </collection>
+   </resultMap>
+   
+   <select id="listUsers" resultMap="UserBackMap">
+       SELECT
+       ua.id,
+       user_info_id,
+       avatar,
+       nickname,
+       login_type,
+       r.id as role_id,
+       role_name,
+       ip_address,
+       ip_source,
+       ua.create_time,
+       last_login_time,
+       ui.is_disable
+       FROM
+       (
+       SELECT
+       id,
+       avatar,
+       nickname,
+       is_disable
+       FROM
+       tb_user_info
+       <where>
+           <if test="condition.loginType != null">
+               id in
+               (
+               SELECT
+               user_info_id
+               FROM
+               tb_user_auth
+               WHERE
+               login_type =  #{condition.loginType}
+               )
+           </if>
+           <if test="condition.keywords != null">
+               and nickname like concat('%',#{condition.keywords},'%')
+           </if>
+       </where>
+       LIMIT #{current},#{size}
+       )   ui
+       LEFT JOIN tb_user_auth ua ON ua.user_info_id = ui.id
+       LEFT JOIN tb_user_role ur ON ui.id = ur.user_id
+       LEFT JOIN tb_role r ON ur.role_id = r.id
+   </select>
+   ```
+
+### 6）用户修改密码
+
+#### 参数
+
+```java
+{
+  "code": {邮箱验证码},
+  "password": {新密码},
+  "username": {邮箱账号}
+}
+```
+
+#### 简介
+
+主要是用于用户忘记密码操作，通过重新邮箱验证，再登录
+
+#### 实现细节
+
+1. 先验证码账号的合法性
+
+   ```java
+   // 校验账号是否合法，同时有邮箱验证码验证
+   if (!checkUser(user)) {
+       throw new AppException("邮箱尚未注册！");
+   }
+   ```
+
+2. 根据用户名修改密码
+
+   ```java
+   // 根据用户名修改密码
+   userAuthMapper.update(new UserAuth(), new LambdaUpdateWrapper<UserAuth>()
+                         .set(UserAuth::getPassword, PasswordUtils.encrypt(user.getPassword()))
+                         .eq(UserAuth::getUsername, user.getUsername()));
+   ```
+
+### 7）管理员修改密码
+
+#### 参数
+
+```java
+{
+  "newPassword": {新密码},
+  "oldPassword": {老密码}
+}
+```
+
+#### 简介
+
+用于管理员后台自己修改密码，但是需要之前旧密码才行
+
+#### 实现细节
+
+1. 查询旧密码
+
+   ```java
+   // 查询旧密码是否正确
+   UserAuth user = userAuthMapper.selectOne(new LambdaQueryWrapper<UserAuth>()
+                                            .eq(UserAuth::getId, StpUtil.getLoginIdAsInt()));
+   ```
+
+2. 正确则修改密码，错误则提示不正确
+
+   ```java
+   // 正确则修改密码，错误则提示不正确
+   if (Objects.nonNull(user) && PasswordUtils.match(passwordVO.getOldPassword(), user.getPassword())) {
+       UserAuth userAuth = UserAuth.builder()
+           .id(StpUtil.getLoginIdAsInt())
+           .password(PasswordUtils.encrypt(passwordVO.getNewPassword()))
+           .build();
+       userAuthMapper.updateById(userAuth);
+   } else {
+       throw new AppException("旧密码不正确");
+   }
+   ```
+
+   
+
+
+
+
 
 ## 用户信息模块
 

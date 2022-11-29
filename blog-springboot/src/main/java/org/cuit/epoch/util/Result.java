@@ -1,6 +1,7 @@
 package org.cuit.epoch.util;
 
 import lombok.Data;
+import lombok.ToString;
 import org.cuit.epoch.enums.StatusCodeEnum;
 
 import static org.cuit.epoch.enums.StatusCodeEnum.FAIL;
@@ -12,6 +13,7 @@ import static org.cuit.epoch.enums.StatusCodeEnum.SUCCESS;
  * @description:
  */
 @Data
+@ToString
 public class Result<T> {
 
     /**
