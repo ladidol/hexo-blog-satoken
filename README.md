@@ -2349,3 +2349,109 @@ keywords关键字，这里用ConditionVo类来封装。
    ```
 
 3. 该操作也是需要操作日志持久化一下的：`@OptLog(optType = REMOVE)`
+
+
+
+
+
+## 友链模块
+
+### 1）查看友链列表
+
+#### 参数
+
+无。
+
+#### 简介
+
+不需要分页查询
+
+#### 实现细节
+
+1. 直接通过mp自带selectList查询就行
+
+   ```java
+   // 查询友链列表
+   List<FriendLink> friendLinkList = friendLinkMapper.selectList(null);
+   return BeanCopyUtils.copyList(friendLinkList, FriendLinkDTO.class);
+   ```
+
+### 2）查看后台友链列表
+
+#### 参数
+
+当前页码+页面大小 可选的 关键字模糊搜索
+
+#### 简介
+
+可实现的关键字模糊搜索的分页查询
+
+#### 实现细节
+
+1. 先查询出来
+
+   ```java
+   // 分页查询友链列表
+   Page<FriendLink> page = new Page<>(PageUtils.getCurrent(), PageUtils.getSize());
+   Page<FriendLink> friendLinkPage = friendLinkMapper.selectPage(page, new LambdaQueryWrapper<FriendLink>()
+                                                                 .like(StringUtils.isNotBlank(condition.getKeywords()), FriendLink::getLinkName, condition.getKeywords()));
+   ```
+
+2. 在进行DTO转化就行了
+
+   ```java
+   // 转换DTO
+   List<FriendLinkBackDTO> friendLinkBackDTOList = BeanCopyUtils.copyList(friendLinkPage.getRecords(), FriendLinkBackDTO.class);
+   return new PageResult<>(friendLinkBackDTOList, (int) friendLinkPage.getTotal());
+   ```
+
+### 3）保存或更新友链
+
+#### 参数
+
+```java
+{
+  "id": {不填},
+  "linkAddress": {url},
+  "linkAvatar": {头像url},
+  "linkIntro": {简介},
+  "linkName": {网站名}
+}
+```
+
+
+
+#### 简介
+
+简单的保存操作
+
+#### 实现细节
+
+1. ```java
+   FriendLink friendLink = BeanCopyUtils.copyObject(friendLinkVO, FriendLink.class);
+   this.saveOrUpdate(friendLink);
+   ```
+
+
+
+
+
+
+
+### 4）删除友链
+
+#### 参数
+
+友链id
+
+#### 简介
+
+根据友链id直接删除就行
+
+#### 实现细节
+
+1. ```java
+   friendLinkService.removeByIds(linkIdList);
+   ```
+
+   
