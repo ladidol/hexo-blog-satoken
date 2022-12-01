@@ -7,6 +7,21 @@
 
 注意完成开发后要把邮箱验证功能恢复
 
+Sa-token的Session：
+
+> Sa-Token Session可以理解为 HttpSession 的升级版：
+>
+> 1. Sa-Token只在调用`StpUtil.login(id)`登录会话时才会产生Session，不会为每个陌生会话都产生Session，节省性能
+> 2. 在登录时产生的Session，是分配给账号id的，而不是分配给指定客户端的，也就是说在PC、APP上登录的同一账号所得到的Session也是同一个，所以两端可以非常轻松的同步数据
+> 3. Sa-Token支持Cookie、Header、body三个途径提交Token，而不是仅限于Cookie
+> 4. 由于不强依赖Cookie，所以只要将Token存储到不同的地方，便可以做到一个客户端同时登录多个账号
+
+
+
+
+
+
+
 ## 自定义架构模块
 
 ### 角色权限管理模块
@@ -733,6 +748,41 @@ public class MySourceSafilterAuthStrategy implements SaFilterAuthStrategy {
 #### 实现细节
 
 先查询账号是不是存在的（账号合理性）
+
+先得到用户的详细信息UserDetailDTO
+
+判断用户是否存在：
+
+```java
+// 查询账号是否存在
+UserAuth userAuth = userAuthMapper.selectOne(new LambdaQueryWrapper<UserAuth>()
+                                             .select(UserAuth::getId, UserAuth::getUserInfoId, UserAuth::getUsername, UserAuth::getPassword, UserAuth::getLoginType)
+                                             .eq(UserAuth::getUsername, username));
+if (Objects.isNull(userAuth)) {
+    throw new AppException("用户名不存在!");
+}
+```
+
+
+
+判断密码正确性：
+
+```java
+if (!userDetailDTO.getPassword().equals(PasswordUtils.encrypt(password))) {
+    throw new AppException("密码错误！");
+}
+```
+
+判断是否被禁用：
+
+```java
+// 判断账号是否禁用
+if (userDetailDTO.getIsDisable().equals(TRUE)) {
+    throw new AppException("账号已被禁用");
+}
+```
+
+
 
 这里通过Satoken登录就直接调用`StpUtil.login()`登录就行，同时将用户详细信息存入session，这里也可以考略将他们存入Redis中去。
 
@@ -1537,6 +1587,98 @@ type参数：1表示查询用户的地区分布，2表示查询游客的地区�
 2. ```java
    @Transactional(rollbackFor = Exception.class)
    ```
+
+
+
+### 4）后台修改用户角色和昵称
+
+#### 参数
+
+```json
+{
+  "nickname": {昵称},
+  "roleIdList": {所属的全部角色id列表},
+  "userInfoId": {用户信息id}
+}
+```
+
+#### 简介
+
+就是更新用户角色或者昵称的一个接口
+
+#### 实现细节
+
+1. 先根据id更新用户昵称
+
+   ```java
+   // 更新用户角色和昵称
+   UserInfo userInfo = UserInfo.builder()
+       .id(userRoleVO.getUserInfoId())
+       .nickname(userRoleVO.getNickname())
+       .build();
+   userInfoDao.updateById(userInfo);
+   ```
+
+2. 更新用户角色，就是先删除原来的用户角色，再根据roleidlist添加进UserRole表中
+
+   ```java
+   // 删除用户角色重新添加
+   userRoleService.remove(new LambdaQueryWrapper<UserRole>()
+                          .eq(UserRole::getUserId, userRoleVO.getUserInfoId()));
+   List<UserRole> userRoleList = userRoleVO.getRoleIdList().stream()
+       .map(roleId -> UserRole.builder()
+            .roleId(roleId)
+            .userId(userRoleVO.getUserInfoId())
+            .build())
+       .collect(Collectors.toList());
+   userRoleService.saveBatch(userRoleList);
+   ```
+
+3. 加个事务`@Transactional(rollbackFor = Exception.class)`
+
+### 5）后台修改用户账号的封禁情况
+
+#### 参数
+
+```json
+{
+  "id": 0,
+  "isDisable": 0
+}
+```
+
+#### 简介
+
+更新用户封禁情况，默认0不封禁，1封禁
+
+#### 实现细节
+
+1. 根据用户信息id来更新用户封禁情况
+
+   ```java
+   // 更新用户禁用状态
+   UserInfo userInfo = UserInfo.builder()
+       .id(userDisableVO.getId())
+       .isDisable(userDisableVO.getIsDisable())
+       .build();
+   userInfoDao.updateById(userInfo);
+   ```
+
+2. 登录的时候会判断用户账号的可用情况。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2431,10 +2573,6 @@ keywords关键字，这里用ConditionVo类来封装。
    FriendLink friendLink = BeanCopyUtils.copyObject(friendLinkVO, FriendLink.class);
    this.saveOrUpdate(friendLink);
    ```
-
-
-
-
 
 
 

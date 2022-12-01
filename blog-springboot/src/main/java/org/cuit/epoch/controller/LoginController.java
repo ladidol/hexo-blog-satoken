@@ -63,7 +63,7 @@ public class LoginController {
         return Result.ok(userDetailDTO);
     }
 
-    @GetMapping("logout")
+    @RequestMapping("logout")
     @ApiOperation(value = "注销登录")
     public Result<String> logout() {
         userAuthService.logout();

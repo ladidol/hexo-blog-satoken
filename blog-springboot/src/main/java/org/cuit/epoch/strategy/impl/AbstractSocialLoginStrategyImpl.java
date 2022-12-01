@@ -76,7 +76,7 @@ public abstract class AbstractSocialLoginStrategyImpl implements SocialLoginStra
 //        // 将登录信息放入springSecurity管理
 //        UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(userDetailDTO, null, userDetailDTO.getAuthorities());
 //        SecurityContextHolder.getContext().setAuthentication(auth);
-        // TODO: 2022/11/22 这里可以将登录信息放到Sa-token中管理
+        // 2022/11/22 这里可以将登录信息放到Sa-token中管理
         //sa-token登录
         StpUtil.login(userDetailDTO.getId());
         //将用户角色信息存入session中

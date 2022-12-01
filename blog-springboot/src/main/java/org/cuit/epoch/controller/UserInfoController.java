@@ -3,15 +3,20 @@ package org.cuit.epoch.controller;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiImplicitParam;
 import io.swagger.annotations.ApiOperation;
+import org.cuit.epoch.annotation.OptLog;
 import org.cuit.epoch.service.UserInfoService;
 import org.cuit.epoch.util.Result;
 import org.cuit.epoch.vo.EmailVO;
+import org.cuit.epoch.vo.UserDisableVO;
 import org.cuit.epoch.vo.UserInfoVO;
+import org.cuit.epoch.vo.UserRoleVO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.validation.Valid;
+
+import static org.cuit.epoch.enums.OptTypeConst.UPDATE;
 
 /**
  * @author: ladidol
@@ -63,34 +68,34 @@ public class UserInfoController {
         return Result.ok();
     }
 
-//    /**
-//     * 修改用户角色
-//     *
-//     * @param userRoleVO 用户角色信息
-//     * @return {@link Result<>}
-//     */
-//    @OptLog(optType = UPDATE)
-//    @ApiOperation(value = "修改用户角色")
-//    @PutMapping("/admin/users/role")
-//    public Result<?> updateUserRole(@Valid @RequestBody UserRoleVO userRoleVO) {
-//        userInfoService.updateUserRole(userRoleVO);
-//        return Result.ok();
-//    }
+    /**
+     * 修改用户角色
+     *
+     * @param userRoleVO 用户角色信息
+     * @return {@link Result<>}
+     */
+    @OptLog(optType = UPDATE)
+    @ApiOperation(value = "后台修改用户角色和昵称")
+    @PutMapping("/admin/users/role")
+    public Result<?> updateUserRole(@Valid @RequestBody UserRoleVO userRoleVO) {
+        userInfoService.updateUserRole(userRoleVO);
+        return Result.ok();
+    }
 
-//    /**
-//     * 修改用户禁用状态
-//     *
-//     * @param userDisableVO 用户禁用信息
-//     * @return {@link Result<>}
-//     */
-//    @OptLog(optType = UPDATE)
-//    @ApiOperation(value = "修改用户禁用状态")
-//    @PutMapping("/admin/users/disable")
-//    public Result<?> updateUserDisable(@Valid @RequestBody UserDisableVO userDisableVO) {
-//        userInfoService.updateUserDisable(userDisableVO);
-//        return Result.ok();
-//    }
-//
+    /**
+     * 修改用户禁用状态
+     *
+     * @param userDisableVO 用户禁用信息
+     * @return {@link Result<>}
+     */
+    @OptLog(optType = UPDATE)
+    @ApiOperation(value = "修改用户禁用状态")
+    @PutMapping("/admin/users/disable")
+    public Result<?> updateUserDisable(@Valid @RequestBody UserDisableVO userDisableVO) {
+        userInfoService.updateUserDisable(userDisableVO);
+        return Result.ok();
+    }
+
 //    /**
 //     * 查看在线用户
 //     *

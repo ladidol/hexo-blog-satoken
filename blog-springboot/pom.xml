@@ -138,11 +138,14 @@
             <version>${sa-token.version}</version>
         </dependency>
         <!-- Sa-Token整合 Redis (使用jackson序列化方式) -->
-        <dependency>
-            <groupId>cn.dev33</groupId>
-            <artifactId>sa-token-dao-redis-jackson</artifactId>
-            <version>${sa-token.version}</version>
-        </dependency>
+<!--        <dependency>-->
+<!--            <groupId>cn.dev33</groupId>-->
+<!--            <artifactId>sa-token-dao-redis-jackson</artifactId>-->
+<!--            <version>${sa-token.version}</version>-->
+<!--        </dependency>-->
+
+
+        <!--=====================================其他小东西 依赖部分==================================-->
 
         <!-- 提供Redis连接池 -->
         <dependency>

@@ -112,6 +112,12 @@ public class UserAuthServiceImpl extends ServiceImpl<UserAuthMapper, UserAuth> i
         if (!userDetailDTO.getPassword().equals(PasswordUtils.encrypt(password))) {
             throw new AppException("密码错误！");
         }
+
+        // 判断账号是否禁用
+        if (userDetailDTO.getIsDisable().equals(TRUE)) {
+            throw new AppException("账号已被禁用");
+        }
+
         //sa-token登录
         StpUtil.login(userDetailDTO.getId());
         //将用户角色信息存入session中
@@ -119,10 +125,14 @@ public class UserAuthServiceImpl extends ServiceImpl<UserAuthMapper, UserAuth> i
         //将用户详细信息存入session中
         StpUtil.getSession().set(USER_INFO, userDetailDTO);
 
+        //将用户UserInfoId存到redis中，方便后序对在线人数进行判断
+        //用户redis信息添加
+        // TODO: 2022/12/1 这里用一个链表的感觉来添加 
+        redisService.set(USER_INFO,userDetailDTO);
+        
 //        //用户redis角色添加
 //        redisService.set(USER_ROLE + StpUtil.getLoginId(), userDetailDTO.getRoleList());
-//        //用户redis信息添加
-//        redisService.set(USER_INFO + StpUtil.getLoginId(),userDetailDTO);
+
 
 
         // 更新用户ip，最近登录时间

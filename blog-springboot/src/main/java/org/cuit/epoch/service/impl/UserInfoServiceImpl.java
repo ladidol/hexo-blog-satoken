@@ -7,15 +7,19 @@ import com.baomidou.mybatisplus.core.toolkit.StringUtils;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import lombok.extern.slf4j.Slf4j;
 import org.cuit.epoch.dto.UserDetailDTO;
+import org.cuit.epoch.dto.UserOnlineDTO;
 import org.cuit.epoch.entity.UserInfo;
+import org.cuit.epoch.entity.UserRole;
 import org.cuit.epoch.enums.FilePathEnum;
 import org.cuit.epoch.exception.AppException;
 import org.cuit.epoch.mapper.UserInfoMapper;
 import org.cuit.epoch.service.RedisService;
 import org.cuit.epoch.service.UserInfoService;
+import org.cuit.epoch.service.UserRoleService;
 import org.cuit.epoch.strategy.context.UploadStrategyContext;
-import org.cuit.epoch.vo.EmailVO;
-import org.cuit.epoch.vo.UserInfoVO;
+import org.cuit.epoch.util.PageUtils;
+import org.cuit.epoch.vo.*;
+import org.cuit.epoch.vo.page.PageResult;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,6 +31,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import static org.cuit.epoch.enums.RedisPrefixConst.*;
+import static org.cuit.epoch.util.PageUtils.getLimitCurrent;
 
 /**
  * @author: ladidol
@@ -38,9 +43,9 @@ import static org.cuit.epoch.enums.RedisPrefixConst.*;
 public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> implements UserInfoService {
     @Autowired
     private UserInfoMapper userInfoDao;
+    @Autowired
+    private UserRoleService userRoleService;
     //    @Autowired
-//    private UserRoleService userRoleService;
-//    @Autowired
 //    private SessionRegistry sessionRegistry;
     @Autowired
     private RedisService redisService;
@@ -55,7 +60,7 @@ public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> i
         // 2022/11/21 值得注意的是，需要存入redis中的序列化对象需要有构造函数。
 //        UserDetailDTO userDetailDTO = (UserDetailDTO) redisService.get(USER_INFO + StpUtil.getLoginId());
         // 2022/11/22 这里就直接从session中拿用户信息吧。
-        UserDetailDTO userDetailDTO  = (UserDetailDTO) StpUtil.getSession().get(USER_INFO);
+        UserDetailDTO userDetailDTO = (UserDetailDTO) StpUtil.getSession().get(USER_INFO);
 
         // 封装用户信息
         UserInfo userInfo = UserInfo.builder()
@@ -74,7 +79,7 @@ public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> i
         // 头像上传
         String avatar = uploadStrategyContext.executeUploadStrategy(file, FilePathEnum.AVATAR.getPath());
 //        UserDetailDTO userDetailDTO = (UserDetailDTO) redisService.get(USER_INFO + StpUtil.getLoginId());
-        UserDetailDTO userDetailDTO  = (UserDetailDTO) StpUtil.getSession().get(USER_INFO);
+        UserDetailDTO userDetailDTO = (UserDetailDTO) StpUtil.getSession().get(USER_INFO);
         // 2022/11/22 这里就直接从session中拿用户信息吧。
         // 更新用户信息
         UserInfo userInfo = UserInfo.builder()
@@ -90,7 +95,7 @@ public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> i
     public void saveUserEmail(EmailVO emailVO) {
         log.info("loginId = " + StpUtil.getLoginId() + " 更改用户邮箱");
 //        UserDetailDTO userDetailDTO = (UserDetailDTO) redisService.get(USER_INFO + StpUtil.getLoginId());
-        UserDetailDTO userDetailDTO  = (UserDetailDTO) StpUtil.getSession().get(USER_INFO);
+        UserDetailDTO userDetailDTO = (UserDetailDTO) StpUtil.getSession().get(USER_INFO);
         // 2022/11/22 这里就直接从session中拿用户信息吧。
         //依旧需要进行邮箱验证
         if (!emailVO.getCode().equals(redisService.get(USER_CODE_KEY + emailVO.getEmail()).toString())) {
@@ -103,55 +108,63 @@ public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> i
         userInfoDao.updateById(userInfo);
     }
 
-//    @Transactional(rollbackFor = Exception.class)
-//    @Override
-//    public void updateUserRole(UserRoleVO userRoleVO) {
-//        // 更新用户角色和昵称
-//        UserInfo userInfo = UserInfo.builder()
-//                .id(userRoleVO.getUserInfoId())
-//                .nickname(userRoleVO.getNickname())
-//                .build();
-//        userInfoDao.updateById(userInfo);
-//        // 删除用户角色重新添加
-//        userRoleService.remove(new LambdaQueryWrapper<UserRole>()
-//                .eq(UserRole::getUserId, userRoleVO.getUserInfoId()));
-//        List<UserRole> userRoleList = userRoleVO.getRoleIdList().stream()
-//                .map(roleId -> UserRole.builder()
-//                        .roleId(roleId)
-//                        .userId(userRoleVO.getUserInfoId())
-//                        .build())
-//                .collect(Collectors.toList());
-//        userRoleService.saveBatch(userRoleList);
-//    }
-//
-//    @Transactional(rollbackFor = Exception.class)
-//    @Override
-//    public void updateUserDisable(UserDisableVO userDisableVO) {
-//        // 更新用户禁用状态
-//        UserInfo userInfo = UserInfo.builder()
-//                .id(userDisableVO.getId())
-//                .isDisable(userDisableVO.getIsDisable())
-//                .build();
-//        userInfoDao.updateById(userInfo);
-//    }
-//
-//    @Override
-//    public PageResult<UserOnlineDTO> listOnlineUsers(ConditionVO conditionVO) {
-//        // 获取security在线session
+    @Transactional(rollbackFor = Exception.class)
+    @Override
+    public void updateUserRole(UserRoleVO userRoleVO) {
+        // 更新用户角色和昵称
+        UserInfo userInfo = UserInfo.builder()
+                .id(userRoleVO.getUserInfoId())
+                .nickname(userRoleVO.getNickname())
+                .build();
+        userInfoDao.updateById(userInfo);
+        // 删除用户角色重新添加
+        userRoleService.remove(new LambdaQueryWrapper<UserRole>()
+                .eq(UserRole::getUserId, userRoleVO.getUserInfoId()));
+        List<UserRole> userRoleList = userRoleVO.getRoleIdList().stream()
+                .map(roleId -> UserRole.builder()
+                        .roleId(roleId)
+                        .userId(userRoleVO.getUserInfoId())
+                        .build())
+                .collect(Collectors.toList());
+        userRoleService.saveBatch(userRoleList);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    @Override
+    public void updateUserDisable(UserDisableVO userDisableVO) {
+        // 更新用户禁用状态
+        UserInfo userInfo = UserInfo.builder()
+                .id(userDisableVO.getId())
+                .isDisable(userDisableVO.getIsDisable())
+                .build();
+        userInfoDao.updateById(userInfo);
+    }
+
+    @Override
+    public PageResult<UserOnlineDTO> listOnlineUsers(ConditionVO conditionVO) {
+        // TODO: 2022/12/1 这里需要搞到全部登录者
+        // TODO: 2022/12/1 第一个解决方案就是从redis中拿，但是好像没有用过redis中的token
+        // TODO: 2022/12/1 这里把登录逻辑再增加一点，就是不使用satoken自带的redis集成，通过自定义，将全部用户的userInfoid存入redis中去
+        // TODO: 2022/12/1 这里需要对redis的方法熟悉一下，不然很多东西都很陌生 
+
+
+        // 获取security在线session
 //        List<UserOnlineDTO> userOnlineDTOList = sessionRegistry.getAllPrincipals().stream()
 //                .filter(item -> sessionRegistry.getAllSessions(item, false).size() > 0)
 //                .map(item -> JSON.parseObject(JSON.toJSONString(item), UserOnlineDTO.class))
 //                .filter(item -> StringUtils.isBlank(conditionVO.getKeywords()) || item.getNickname().contains(conditionVO.getKeywords()))
 //                .sorted(Comparator.comparing(UserOnlineDTO::getLastLoginTime).reversed())
 //                .collect(Collectors.toList());
+//
 //        // 执行分页
-//        int fromIndex = getLimitCurrent().intValue();
-//        int size = getSize().intValue();
+//        int fromIndex = PageUtils.getLimitCurrent().intValue();
+//        int size = PageUtils.getSize().intValue();
 //        int toIndex = userOnlineDTOList.size() - fromIndex > size ? fromIndex + size : userOnlineDTOList.size();
 //        List<UserOnlineDTO> userOnlineList = userOnlineDTOList.subList(fromIndex, toIndex);
 //        return new PageResult<>(userOnlineList, userOnlineDTOList.size());
-//    }
-//
+        return null;
+    }
+
 //    @Override
 //    public void removeOnlineUser(Integer userInfoId) {
 //        // 获取用户session
