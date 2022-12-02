@@ -39,23 +39,25 @@
 <script>
 import { generaMenu } from "../../assets/js/menu";
 export default {
-  data: function() {
+  data: function () {
     return {
       loginForm: {
         username: "",
-        password: ""
+        password: "",
       },
       rules: {
         username: [
-          { required: true, message: "用户名不能为空", trigger: "blur" }
+          { required: true, message: "用户名不能为空", trigger: "blur" },
         ],
-        password: [{ required: true, message: "密码不能为空", trigger: "blur" }]
-      }
+        password: [
+          { required: true, message: "密码不能为空", trigger: "blur" },
+        ],
+      },
     };
   },
   methods: {
     login() {
-      this.$refs.ruleForm.validate(valid => {
+      this.$refs.ruleForm.validate((valid) => {
         if (valid) {
           const that = this;
           // eslint-disable-next-line no-undef
@@ -63,33 +65,33 @@ export default {
           //   this.config.TENCENT_CAPTCHA,
           //   function(res) {
           //     if (res.ret === 0) {
-                //发送登录请求
-                let param = new URLSearchParams();
-                param.append("username", that.loginForm.username);
-                param.append("password", that.loginForm.password);
-                that.axios.post("/api/login", param).then(({ data }) => {
-                  if (data.flag) {
-                    // 登录后保存用户信息
-                    that.$store.commit("login", data.data);
-                    // 加载用户菜单
-                    generaMenu();
-                    that.$message.success("登录成功");
-                    that.$router.push({ path: "/" });
-                  } else {
-                    that.$message.error(data.message);
-                  }
-                });
+          //发送登录请求
+          let param = new URLSearchParams();
+          param.append("username", that.loginForm.username);
+          param.append("password", that.loginForm.password);
+          that.axios.post("/api/login", param).then(({ data }) => {
+            if (data.flag) {
+              // 登录后保存用户信息
+              that.$store.commit("login", data.data);
+              // 加载用户菜单
+              generaMenu();
+              that.$message.success("登录成功");
+              that.$router.push({ path: "/" });
+            } else {
+              that.$message.error(data.message);
+            }
+          });
           //     }
           //   }
           // );
-          // 显示验证码
+          // //显示验证码
           // captcha.show();
         } else {
           return false;
         }
       });
-    }
-  }
+    },
+  },
 };
 </script>
 

@@ -17,13 +17,13 @@ public interface BlogInfoService {
      */
     BlogHomeInfoDTO getBlogHomeInfo();
 
-//    /**
-//     * 获取后台首页数据
-//     *
-//     * @return 博客后台信息
-//     */
+    /**
+     * 获取后台首页数据
+     *
+     * @return 博客后台信息
+     */
 //    BlogBackInfoDTO getBlogBackInfo();
-//
+
 //    /**
 //     * 保存或更新网站配置
 //     *
