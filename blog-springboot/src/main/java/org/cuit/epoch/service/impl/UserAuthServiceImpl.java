@@ -125,14 +125,18 @@ public class UserAuthServiceImpl extends ServiceImpl<UserAuthMapper, UserAuth> i
         //将用户详细信息存入session中
         StpUtil.getSession().set(USER_INFO, userDetailDTO);
 
-        //将用户UserInfoId存到redis中，方便后序对在线人数进行判断
-        //用户redis信息添加
-        // TODO: 2022/12/1 这里用一个链表的感觉来添加 
-        redisService.set(USER_INFO,userDetailDTO);
-        
+        //将用户UserInfo存到redis中，方便后序对在线人数进行判断
+        Set<UserDetailDTO> onlineUsers = (Set<UserDetailDTO>) redisService.get(USER_ONLINE);
+        onlineUsers.add(userDetailDTO);
+        for (UserDetailDTO onlineUser : onlineUsers) {
+            log.info("onlineUser = " + onlineUser);
+        }
+        redisService.set(USER_ONLINE, onlineUsers);
+
+//        //用户redis信息添加
+//        redisService.set(USER_INFO,userDetailDTO);
 //        //用户redis角色添加
 //        redisService.set(USER_ROLE + StpUtil.getLoginId(), userDetailDTO.getRoleList());
-
 
 
         // 更新用户ip，最近登录时间
@@ -150,6 +154,13 @@ public class UserAuthServiceImpl extends ServiceImpl<UserAuthMapper, UserAuth> i
 //        redisService.del(USER_ROLE + StpUtil.getLoginId());
 //        //删除用户redis中详细信息
 //        redisService.del(USER_INFO + StpUtil.getLoginId());
+
+        //将用户UserInfo从redis中删除
+        Set<Integer> onlineUsers = (Set<Integer>) redisService.get(USER_ONLINE);
+        UserDetailDTO userDetailDTO = (UserDetailDTO) StpUtil.getSession().get(USER_INFO);
+        onlineUsers.remove(userDetailDTO);
+        redisService.set(USER_ONLINE, onlineUsers);
+
         //sa-token注销
         StpUtil.logout();
 

@@ -723,7 +723,63 @@ public class MySourceSafilterAuthStrategy implements SaFilterAuthStrategy {
    }
    ```
 
-   
+
+
+
+### Redis设计
+
+#### 1）在线用户
+
+##### ①数据结构
+
+通过<`String`, `Set<UserDetailDTO>`>的结构，将在线用户存入redis中去
+
+##### ②简介
+
+在用户登录的时候都要在redis中更新一下用户在线情况
+
+```java
+//将用户UserInfo存到redis中，方便后序对在线人数进行判断
+Set<UserDetailDTO> onlineUsers = (Set<UserDetailDTO>) redisService.get(USER_ONLINE);
+onlineUsers.add(userDetailDTO);
+redisService.set(USER_ONLINE, onlineUsers);
+```
+
+
+
+
+
+
+
+
+
+#### 用户地域分布情况
+
+
+
+#### 说说被点赞情况
+
+
+
+#### 文章浏览情况
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -793,6 +849,15 @@ StpUtil.login(userDetailDTO.getId());
 StpUtil.getSession().set(USER_ROLE,userDetailDTO.getRoleList());
 //将用户详细信息存入session中
 StpUtil.getSession().set(USER_INFO,userDetailDTO);
+```
+
+将用户登录情况更新到redis中去
+
+```java
+//将用户UserInfo存到redis中，方便后序对在线人数进行判断
+Set<UserDetailDTO> onlineUsers = (Set<UserDetailDTO>) redisService.get(USER_ONLINE);
+onlineUsers.add(userDetailDTO);
+redisService.set(USER_ONLINE, onlineUsers);
 ```
 
 其中用户详细信息`userDetailDTO`通过`convertUserDetail(userAuth, request)`得到：
@@ -865,9 +930,23 @@ updateUserInfo(userDetailDTO);
 
 #### 实现细节
 
-```java
-StpUtil.logout();
-```
+1. 先从redis在线目录中删除
+
+   ```java
+   //将用户UserInfo从redis中删除
+   Set<Integer> onlineUsers = (Set<Integer>) redisService.get(USER_ONLINE);
+   UserDetailDTO userDetailDTO = (UserDetailDTO) StpUtil.getSession().get(USER_INFO);
+   onlineUsers.remove(userDetailDTO);
+   redisService.set(USER_ONLINE, onlineUsers);
+   ```
+
+2. 再从satoken中退出登录
+
+   ```java
+   StpUtil.logout();
+   ```
+
+   
 
 
 
@@ -1666,11 +1745,95 @@ type参数：1表示查询用户的地区分布，2表示查询游客的地区�
 
 2. 登录的时候会判断用户账号的可用情况。
 
+### 6）查看在线用户
 
+#### 参数
 
+size，current，keywords
 
+#### 简介
 
+可以模糊查询、分页查询的接口。
 
+#### 实现细节
+
+1. 从redis中获取全部在线用户
+
+   ```java
+   // 从redis中获取全部在线用户
+   Set<UserDetailDTO> onlineUser = (Set<UserDetailDTO>) redisService.get(USER_ONLINE);
+   ```
+
+2. 将在线用户封装在UserOnlineDTO中
+
+   ```java
+   List<UserOnlineDTO> userOnlineDTOList = onlineUser.stream()
+       .filter(item -> onlineUser.size() > 0)
+       .map(item -> JSON.parseObject(JSON.toJSONString(item), UserOnlineDTO.class))
+       .filter(item -> StringUtils.isBlank(conditionVO.getKeywords()) || item.getNickname().contains(conditionVO.getKeywords()))
+       .sorted(Comparator.comparing(UserOnlineDTO::getLastLoginTime).reversed())
+       .collect(Collectors.toList());
+   ```
+
+3. 执行分页操作
+
+   ```java
+   // 执行分页
+   int fromIndex = PageUtils.getLimitCurrent().intValue();
+   int size = PageUtils.getSize().intValue();
+   int toIndex = userOnlineDTOList.size() - fromIndex > size ? fromIndex + size : userOnlineDTOList.size();
+   List<UserOnlineDTO> userOnlineList = userOnlineDTOList.subList(fromIndex, toIndex);
+   return new PageResult<>(userOnlineList, userOnlineDTOList.size());
+   ```
+
+   
+
+### 7）下线指定用户
+
+#### 参数
+
+userInfoId
+
+#### 简介
+
+通过userInfoId下线
+
+#### 实现细节
+
+1. 从redis中获取全部在线用户
+
+   ```java
+   // 从redis中获取全部在线用户
+   Set<UserDetailDTO> onlineUsers = (Set<UserDetailDTO>) redisService.get(USER_ONLINE);
+   ```
+
+2. 得到需要下线的用户信息
+
+   ```
+   // 得到指定的
+   List<UserDetailDTO> userInfoList = onlineUsers.stream().filter(item -> {
+       UserDetailDTO userDetailDTO = (UserDetailDTO) item;
+       return userDetailDTO.getUserInfoId().equals(userInfoId);
+   }).collect(Collectors.toList());
+   ```
+
+3. 将其从redis中和它的session去除
+
+   ```java
+   for (UserDetailDTO userDetailDTO : userInfoList) {
+       log.info("踢下线： " + userDetailDTO);
+       StpUtil.logout(userDetailDTO.getId());
+       onlineUsers.remove(userDetailDTO);
+   }
+   ```
+
+4. 重新维护redis中的全部在线人数
+
+   ```java
+   redisService.set(USER_ONLINE, onlineUsers);
+   ```
+
+   
 
 
 

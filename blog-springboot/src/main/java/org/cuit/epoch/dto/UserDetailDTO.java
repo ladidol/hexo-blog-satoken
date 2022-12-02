@@ -13,6 +13,7 @@ import java.io.Serializable;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -121,6 +122,19 @@ public class UserDetailDTO implements Serializable {
      * 操作系统
      */
     private String os;
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        UserDetailDTO that = (UserDetailDTO) o;
+        return Objects.equals(userInfoId, that.userInfoId);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(userInfoId);
+    }
 
     /**
      * 最近登录时间

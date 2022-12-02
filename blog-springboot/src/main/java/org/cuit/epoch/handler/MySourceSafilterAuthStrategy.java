@@ -4,8 +4,11 @@ import cn.dev33.satoken.filter.SaFilterAuthStrategy;
 import cn.dev33.satoken.stp.StpUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.cuit.epoch.dto.ResourceRoleDTO;
+import org.cuit.epoch.dto.UserDetailDTO;
+import org.cuit.epoch.dto.UserInfoDTO;
 import org.cuit.epoch.exception.AppException;
 import org.cuit.epoch.mapper.RoleMapper;
+import org.cuit.epoch.service.RedisService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.util.AntPathMatcher;
@@ -14,7 +17,11 @@ import org.springframework.util.CollectionUtils;
 import javax.annotation.PostConstruct;
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+
+import static org.cuit.epoch.enums.RedisPrefixConst.USER_ONLINE;
 
 /**
  * @author: ladidol
@@ -39,6 +46,9 @@ public class MySourceSafilterAuthStrategy implements SaFilterAuthStrategy {
     @Resource
     private HttpServletRequest request;
 
+    @Resource
+    private RedisService redisService;
+
 
     /**
      * 加载资源角色信息
@@ -48,6 +58,16 @@ public class MySourceSafilterAuthStrategy implements SaFilterAuthStrategy {
         resourceRoleList = roleDao.listResourceRoles();
         log.info("服务器 resourceRoleList 加载： " + resourceRoleList);
     }
+
+    /**
+     * 加载在线用户信息
+     */
+    @PostConstruct // 在Spring中：Constructor >> @Autowired >> @PostConstruct
+    private void initOnlineUser() {
+        redisService.set(USER_ONLINE, new HashSet<UserDetailDTO>());
+        log.info("服务器启动 Redis中在线用户list初始化");
+    }
+
 
     /**
      * 清空接口角色信息

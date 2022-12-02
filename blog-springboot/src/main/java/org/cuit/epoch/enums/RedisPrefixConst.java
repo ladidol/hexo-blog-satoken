@@ -99,6 +99,11 @@ public class RedisPrefixConst {
      */
     public static final String USER_INFO = "new_user_info";
 
+    /**
+     * 用户详细信息
+     *
+     */
+    public static final String USER_ONLINE = "new_user_online";
 
 
 

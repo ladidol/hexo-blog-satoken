@@ -3,6 +3,7 @@ package org.cuit.epoch.strategy.impl;
 import cn.dev33.satoken.stp.StpUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import lombok.extern.slf4j.Slf4j;
 import org.cuit.epoch.dto.strategy.login.SocialTokenDTO;
 import org.cuit.epoch.dto.strategy.login.SocialUserInfoDTO;
 import org.cuit.epoch.dto.UserDetailDTO;
@@ -15,6 +16,7 @@ import org.cuit.epoch.exception.AppException;
 import org.cuit.epoch.mapper.UserAuthMapper;
 import org.cuit.epoch.mapper.UserInfoMapper;
 import org.cuit.epoch.mapper.UserRoleMapper;
+import org.cuit.epoch.service.RedisService;
 import org.cuit.epoch.service.impl.UserAuthServiceImpl;
 import org.cuit.epoch.strategy.SocialLoginStrategy;
 import org.cuit.epoch.util.BeanCopyUtils;
@@ -27,10 +29,11 @@ import javax.servlet.http.HttpServletRequest;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Objects;
+import java.util.Set;
 
 import static org.cuit.epoch.enums.CommonConst.TRUE;
-import static org.cuit.epoch.enums.RedisPrefixConst.USER_INFO;
-import static org.cuit.epoch.enums.RedisPrefixConst.USER_ROLE;
+import static org.cuit.epoch.enums.RedisPrefixConst.*;
+import static org.cuit.epoch.enums.RedisPrefixConst.USER_ONLINE;
 import static org.cuit.epoch.enums.ZoneEnum.SHANGHAI;
 
 /**
@@ -38,6 +41,7 @@ import static org.cuit.epoch.enums.ZoneEnum.SHANGHAI;
  * @date: 2022/11/22 16:12
  * @description:
  */
+@Slf4j
 @Service
 public abstract class AbstractSocialLoginStrategyImpl implements SocialLoginStrategy {
     @Autowired
@@ -50,6 +54,8 @@ public abstract class AbstractSocialLoginStrategyImpl implements SocialLoginStra
     private UserAuthServiceImpl userAuthService;
     @Resource
     private HttpServletRequest request;
+    @Autowired
+    RedisService redisService;
 
     @Override
     public UserInfoDTO login(String data) {
@@ -83,6 +89,13 @@ public abstract class AbstractSocialLoginStrategyImpl implements SocialLoginStra
         StpUtil.getSession().set(USER_ROLE,userDetailDTO.getRoleList());
         //将用户详细信息存入session中
         StpUtil.getSession().set(USER_INFO,userDetailDTO);
+        //将用户UserInfo存到redis中，方便后序对在线人数进行判断
+        Set<UserDetailDTO> onlineUsers = (Set<UserDetailDTO>) redisService.get(USER_ONLINE);
+        onlineUsers.add(userDetailDTO);
+        for (UserDetailDTO onlineUser : onlineUsers) {
+            log.info("onlineUser = " + onlineUser);
+        }
+        redisService.set(USER_ONLINE, onlineUsers);
 
 
 

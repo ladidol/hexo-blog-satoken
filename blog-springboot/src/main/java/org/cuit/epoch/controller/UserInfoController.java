@@ -4,12 +4,11 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiImplicitParam;
 import io.swagger.annotations.ApiOperation;
 import org.cuit.epoch.annotation.OptLog;
+import org.cuit.epoch.dto.UserOnlineDTO;
 import org.cuit.epoch.service.UserInfoService;
 import org.cuit.epoch.util.Result;
-import org.cuit.epoch.vo.EmailVO;
-import org.cuit.epoch.vo.UserDisableVO;
-import org.cuit.epoch.vo.UserInfoVO;
-import org.cuit.epoch.vo.UserRoleVO;
+import org.cuit.epoch.vo.*;
+import org.cuit.epoch.vo.page.PageResult;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -96,29 +95,29 @@ public class UserInfoController {
         return Result.ok();
     }
 
-//    /**
-//     * 查看在线用户
-//     *
-//     * @param conditionVO 条件
-//     * @return {@link Result<UserOnlineDTO>} 在线用户列表
-//     */
-//    @ApiOperation(value = "查看在线用户")
-//    @GetMapping("/admin/users/online")
-//    public Result<PageResult<UserOnlineDTO>> listOnlineUsers(ConditionVO conditionVO) {
-//        return Result.ok(userInfoService.listOnlineUsers(conditionVO));
-//    }
-//
-//    /**
-//     * 下线用户
-//     *
-//     * @param userInfoId 用户信息
-//     * @return {@link Result<>}
-//     */
-//    @ApiOperation(value = "下线用户")
-//    @DeleteMapping("/admin/users/{userInfoId}/online")
-//    public Result<?> removeOnlineUser(@PathVariable("userInfoId") Integer userInfoId) {
-//        userInfoService.removeOnlineUser(userInfoId);
-//        return Result.ok();
-//    }
+    /**
+     * 查看在线用户
+     *
+     * @param conditionVO 条件
+     * @return {@link Result< UserOnlineDTO >} 在线用户列表
+     */
+    @ApiOperation(value = "查看在线用户")
+    @GetMapping("/admin/users/online")
+    public Result<PageResult<UserOnlineDTO>> listOnlineUsers(ConditionVO conditionVO) {
+        return Result.ok(userInfoService.listOnlineUsers(conditionVO));
+    }
+
+    /**
+     * 下线用户
+     *
+     * @param userInfoId 用户信息
+     * @return {@link Result<>}
+     */
+    @ApiOperation(value = "下线用户")
+    @DeleteMapping("/admin/users/{userInfoId}/online")
+    public Result<?> removeOnlineUser(@PathVariable("userInfoId") Integer userInfoId) {
+        userInfoService.removeOnlineUser(userInfoId);
+        return Result.ok();
+    }
 
 }

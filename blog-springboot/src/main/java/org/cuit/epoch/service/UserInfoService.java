@@ -63,6 +63,6 @@ public interface UserInfoService extends IService<UserInfo> {
      *
      * @param userInfoId 用户信息id
      */
-//    void removeOnlineUser(Integer userInfoId);
+    void removeOnlineUser(Integer userInfoId);
 
 }

@@ -25,13 +25,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import static org.cuit.epoch.enums.RedisPrefixConst.*;
-import static org.cuit.epoch.util.PageUtils.getLimitCurrent;
 
 /**
  * @author: ladidol
@@ -45,8 +44,6 @@ public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> i
     private UserInfoMapper userInfoDao;
     @Autowired
     private UserRoleService userRoleService;
-    //    @Autowired
-//    private SessionRegistry sessionRegistry;
     @Autowired
     private RedisService redisService;
     @Autowired
@@ -140,42 +137,45 @@ public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo> i
         userInfoDao.updateById(userInfo);
     }
 
+    @Transactional(rollbackFor = Exception.class)
     @Override
     public PageResult<UserOnlineDTO> listOnlineUsers(ConditionVO conditionVO) {
-        // TODO: 2022/12/1 这里需要搞到全部登录者
-        // TODO: 2022/12/1 第一个解决方案就是从redis中拿，但是好像没有用过redis中的token
-        // TODO: 2022/12/1 这里把登录逻辑再增加一点，就是不使用satoken自带的redis集成，通过自定义，将全部用户的userInfoid存入redis中去
-        // TODO: 2022/12/1 这里需要对redis的方法熟悉一下，不然很多东西都很陌生 
 
+        // 从redis中获取全部在线用户
+        Set<UserDetailDTO> onlineUser = (Set<UserDetailDTO>) redisService.get(USER_ONLINE);
+        List<UserOnlineDTO> userOnlineDTOList = onlineUser.stream()
+                .filter(item -> onlineUser.size() > 0)
+                .map(item -> JSON.parseObject(JSON.toJSONString(item), UserOnlineDTO.class))
+                .filter(item -> StringUtils.isBlank(conditionVO.getKeywords()) || item.getNickname().contains(conditionVO.getKeywords()))
+                .sorted(Comparator.comparing(UserOnlineDTO::getLastLoginTime).reversed())
+                .collect(Collectors.toList());
 
-        // 获取security在线session
-//        List<UserOnlineDTO> userOnlineDTOList = sessionRegistry.getAllPrincipals().stream()
-//                .filter(item -> sessionRegistry.getAllSessions(item, false).size() > 0)
-//                .map(item -> JSON.parseObject(JSON.toJSONString(item), UserOnlineDTO.class))
-//                .filter(item -> StringUtils.isBlank(conditionVO.getKeywords()) || item.getNickname().contains(conditionVO.getKeywords()))
-//                .sorted(Comparator.comparing(UserOnlineDTO::getLastLoginTime).reversed())
-//                .collect(Collectors.toList());
-//
-//        // 执行分页
-//        int fromIndex = PageUtils.getLimitCurrent().intValue();
-//        int size = PageUtils.getSize().intValue();
-//        int toIndex = userOnlineDTOList.size() - fromIndex > size ? fromIndex + size : userOnlineDTOList.size();
-//        List<UserOnlineDTO> userOnlineList = userOnlineDTOList.subList(fromIndex, toIndex);
-//        return new PageResult<>(userOnlineList, userOnlineDTOList.size());
-        return null;
+        // 执行分页
+        int fromIndex = PageUtils.getLimitCurrent().intValue();
+        int size = PageUtils.getSize().intValue();
+        int toIndex = userOnlineDTOList.size() - fromIndex > size ? fromIndex + size : userOnlineDTOList.size();
+        List<UserOnlineDTO> userOnlineList = userOnlineDTOList.subList(fromIndex, toIndex);
+        return new PageResult<>(userOnlineList, userOnlineDTOList.size());
     }
 
-//    @Override
-//    public void removeOnlineUser(Integer userInfoId) {
-//        // 获取用户session
-//        List<Object> userInfoList = sessionRegistry.getAllPrincipals().stream().filter(item -> {
-//            UserDetailDTO userDetailDTO = (UserDetailDTO) item;
-//            return userDetailDTO.getUserInfoId().equals(userInfoId);
-//        }).collect(Collectors.toList());
-//        List<SessionInformation> allSessions = new ArrayList<>();
-//        userInfoList.forEach(item -> allSessions.addAll(sessionRegistry.getAllSessions(item, false)));
-//        // 注销session
-//        allSessions.forEach(SessionInformation::expireNow);
-//    }
+    @Override
+    public void removeOnlineUser(Integer userInfoId) {
+
+        // 从redis中获取全部在线用户
+        Set<UserDetailDTO> onlineUsers = (Set<UserDetailDTO>) redisService.get(USER_ONLINE);
+        // 得到指定的
+        List<UserDetailDTO> userInfoList = onlineUsers.stream().filter(item -> {
+            UserDetailDTO userDetailDTO = (UserDetailDTO) item;
+            return userDetailDTO.getUserInfoId().equals(userInfoId);
+        }).collect(Collectors.toList());
+
+        for (UserDetailDTO userDetailDTO : userInfoList) {
+            log.info("踢下线： " + userDetailDTO);
+            StpUtil.logout(userDetailDTO.getId());
+            onlineUsers.remove(userDetailDTO);
+        }
+        redisService.set(USER_ONLINE, onlineUsers);
+
+    }
 
 }
