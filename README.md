@@ -2755,4 +2755,437 @@ keywords关键字，这里用ConditionVo类来封装。
    friendLinkService.removeByIds(linkIdList);
    ```
 
+
+
+
+## 文章分类模块
+
+### 1）前台查看分类列表
+
+#### 参数
+
+无。
+
+#### 简介
+
+不需要分页查询
+
+#### 实现细节
+
+1. 直接通过mapper层的自定义sql查询列表就行
+
+   ```java
+       <select id="listCategoryDTO" resultType="org.cuit.epoch.dto.category.CategoryDTO">
+   		SELECT
+   		  c.id,
+   		  c.category_name,
+   		  COUNT( a.id ) AS article_count
+   		FROM
+   		  tb_category c
+   		  LEFT JOIN ( SELECT id, category_id FROM tb_article WHERE is_delete = 0 AND `status` = 1 ) a ON c.id = a.category_id
+   		GROUP BY
+   		  c.id
+       </select>
+   ```
+
+   service层：
+
+   ```java
+   return new PageResult<>(categoryMapper.listCategoryDTO(), categoryMapper.selectCount(null));
+   ```
+
+   值得提示的是很多查询全部数据或者查询总数，直接存入空(null)的queryWrapper就可以
+
+
+
+
+
+### 2）后台查看分类列表
+
+#### 参数
+
+size+current+condition
+
+#### 简介
+
+简单的分页查询+模糊查询关键字参数
+
+#### 实现细节
+
+1. 先快速查询一下，判断空否
+
+   ```java
+   // 查询分类数量
+   Integer count = categoryMapper.selectCount(new LambdaQueryWrapper<Category>()
+                                              .like(StringUtils.isNotBlank(condition.getKeywords()), Category::getCategoryName, condition.getKeywords()));
+   if (count == 0) {
+       return new PageResult<>();
+   }
+   ```
+
+2. 有数据就开始分页查询
+
+   service层：
+
+   ```java
+   // 分页查询分类列表
+   List<CategoryBackDTO> categoryList = categoryMapper.listCategoryBackDTO(PageUtils.getLimitCurrent(), PageUtils.getSize(), condition);
+   return new PageResult<>(categoryList, count);
+   ```
+
+   mapper层：
+
+   ```java
+   	<select id="listCategoryBackDTO" resultType="org.cuit.epoch.dto.category.CategoryBackDTO">
+   		SELECT
+   		  c.id,
+   		  c.category_name,
+   		  COUNT( a.id ) AS article_count,
+   		  c.create_time
+   		FROM
+   		  tb_category c
+   		  LEFT JOIN tb_article a ON c.id = a.category_id
+   		<where>
+   			<if test="condition.keywords != null">
+   			     category_name like concat('%',#{condition.keywords},'%')
+   			</if>
+   		</where>
+   		GROUP BY
+   		  c.id
+   		ORDER BY
+   		  c.id DESC
+           LIMIT #{current},#{size}
+   	</select>
+   ```
+
+#### 注意
+
+1. 注意其中sql中的`concat函数`是用于判断参数是不是是为空用的。同时双重保障
+
+   ```sql
+   	<where>
+   		<if test="condition.keywords != null">
+   		     category_name like concat('%',#{condition.keywords},'%')
+   		</if>
+   	</where>
+   ```
+
+2. 这里直接传了对象condition，进去再用的其属性keywords
+
+
+
+### 3）模糊搜索分类（写文章时用的）
+
+#### 参数
+
+可有可无的关键字查询
+
+#### 简介
+
+模糊查询，只查询id和name
+
+#### 实现细节
+
+1. 直接mp中querywrapper查询就行
+
+   ```java
+   // 搜索分类
+   List<Category> categoryList = categoryMapper.selectList(new LambdaQueryWrapper<Category>()
+                                                           .like(StringUtils.isNotBlank(condition.getKeywords()), Category::getCategoryName, condition.getKeywords())
+                                                           .orderByDesc(Category::getId));
+   return BeanCopyUtils.copyList(categoryList, CategoryOptionDTO.class);
+   ```
+
+   
+
+
+
+
+
+
+
+### 4）添加或修改分类
+
+#### 参数
+
+无。
+
+#### 简介
+
+不需要分页查询，需要加到操作日志中去`@OptLog(optType = SAVE_OR_UPDATE)`
+
+#### 实现细节
+
+1. 依旧是用很帅的方式来判断重复（也巧妙地分开了保存和修改操作）
+
+   ```java
+   Category existCategory = categoryMapper.selectOne(new LambdaQueryWrapper<Category>()
+                                                     .select(Category::getId)
+                                                     .eq(Category::getCategoryName, categoryVO.getCategoryName()));
+   if (Objects.nonNull(existCategory) && !existCategory.getId().equals(categoryVO.getId())) {
+       //依旧用到了，这种方式来分开保存和更新操作的重复判。
+       throw new AppException("分类名已存在");
+   }
+   ```
+
+2. saveOrUpdate()方法
+
+   ```java
+   Category category = Category.builder()
+       .id(categoryVO.getId())
+       .categoryName(categoryVO.getCategoryName())
+       .build();
+   this.saveOrUpdate(category);
+   ```
+
+   
+
+
+
+### 5）删除分类
+
+#### 参数
+
+categoryIdList，分类id列表
+
+#### 简介
+
+批量删除文章，其中需要判断分类下有没有其他的文章绑定。需要加到操作日志中去`@OptLog(optType = REMOVE)`
+
+#### 实现细节
+
+1. 判断有没有文章绑定有（这里一个article只有一个category，所以直接用categoryId查询就行咯，所以直接查询Article表就行了），种类用in来判断。
+
+   ```java
+   // 查询分类id下是否有文章
+   Integer count = articleMapper.selectCount(new LambdaQueryWrapper<Article>()
+                                             .in(Article::getCategoryId, categoryIdList));
+   if (count > 0) {
+       throw new AppException("删除失败，该分类下存在文章");
+   }
+   ```
+
+   
+
+2. deleteBatchIds
+
+   ```java
+   categoryMapper.deleteBatchIds(categoryIdList);
+   ```
+
+   
+
+
+
+
+
+
+
+## 文章标签模块
+
+### 1）前台查看标签列表
+
+#### 参数
+
+无。
+
+#### 简介
+
+不需要分页查询，这里因为不需要指定每一个标签下面的文章个数（没必要）所以不需要自定义sql语句
+
+#### 实现细节
+
+1. 通过`selectList`和`BeanCopyUtils.copyList`
+
+   ```java
+   // 查询标签列表
+   List<Tag> tagList = tagDao.selectList(null);
+   // 转换DTO
+   List<TagDTO> tagDTOList = BeanCopyUtils.copyList(tagList, TagDTO.class);
+   ```
+
+   页面返回
+
+   ```java
+   // 查询标签数量
+   Integer count = tagDao.selectCount(null);
+   return new PageResult<>(tagDTOList, count);
+   ```
+
+   
+
+
+
+### 2）后台查看标签列表
+
+#### 参数
+
+size+current+condition
+
+#### 简介
+
+简单的分页查询+模糊查询关键字参数
+
+#### 实现细节
+
+1. 先快速查询一下，判断空否
+
+   ```java
+   // 查询标签数量
+   Integer count = tagDao.selectCount(new LambdaQueryWrapper<Tag>()
+                                      .like(StringUtils.isNotBlank(condition.getKeywords()), Tag::getTagName, condition.getKeywords()));
+   if (count == 0) {
+       return new PageResult<>();
+   }
+   ```
+
+2. 有数据就开始分页查询
+
+   service层：
+
+   ```java
+   // 分页查询标签列表
+   List<TagBackDTO> tagList = tagDao.listTagBackDTO(PageUtils.getLimitCurrent(), PageUtils.getSize(), condition);
+   return new PageResult<>(tagList, count);
+   ```
+
+   mapper层：
+
+   ```java
+       <select id="listTagBackDTO" resultType="org.cuit.epoch.dto.tag.TagBackDTO">
+           SELECT
+             t.id,
+             tag_name,
+             COUNT( tat.article_id ) AS article_count,
+             t.create_time
+           FROM
+             tb_tag t
+             LEFT JOIN tb_article_tag tat ON t.id = tat.tag_id
+           <where>
+               <if test="condition.keywords != null">
+                    tag_name like concat('%',#{condition.keywords},'%')
+               </if>
+           </where>
+           GROUP BY
+             t.id
+           ORDER BY
+             t.id DESC
+           LIMIT #{current},#{size}
+       </select>
+   ```
+
+#### 注意
+
+1. 注意其中sql中的`concat函数`是用于判断参数是不是是为空用的。同时双重保障
+
+   ```sql
+           <where>
+               <if test="condition.keywords != null">
+                    tag_name like concat('%',#{condition.keywords},'%')
+               </if>
+           </where>
+   ```
+
+2. 这里直接传了对象condition，进去再用的其属性keywords
+
+3. 就是和分类的后台列表查询一样的模板
+
+
+
+### 3）模糊搜索标签（写文章时用的）
+
+#### 参数
+
+可有可无的关键字查询
+
+#### 简介
+
+模糊查询，只查询id和name
+
+#### 实现细节
+
+1. 直接mp中querywrapper查询就行（id降序，就是添加的顺序）
+
+   ```java
+   // 搜索标签
+   List<Tag> tagList = tagDao.selectList(new LambdaQueryWrapper<Tag>()
+                                         .like(StringUtils.isNotBlank(condition.getKeywords()), Tag::getTagName, condition.getKeywords())
+                                         .orderByDesc(Tag::getId));
+   return BeanCopyUtils.copyList(tagList, TagDTO.class);
+   ```
+
+   
+
+
+
+
+
+
+
+### 4）添加或修改标签
+
+#### 参数
+
+无。
+
+#### 简介
+
+不需要分页查询，需要加到操作日志中去`@OptLog(optType = SAVE_OR_UPDATE)`
+
+#### 实现细节
+
+1. 依旧是用很帅的方式来判断重复（也巧妙地分开了保存和修改操作）
+
+   ```java
+   // 查询标签名是否存在
+   Tag existTag = tagDao.selectOne(new LambdaQueryWrapper<Tag>()
+                                   .select(Tag::getId)
+                                   .eq(Tag::getTagName, tagVO.getTagName()));
+   if (Objects.nonNull(existTag) && !existTag.getId().equals(tagVO.getId())) {
+       throw new AppException("标签名已存在");
+   }
+   ```
+
+2. saveOrUpdate()方法
+
+   ```java
+   Tag tag = BeanCopyUtils.copyObject(tagVO, Tag.class);
+   this.saveOrUpdate(tag);
+   ```
+
+   
+
+
+
+### 5）删除标签
+
+#### 参数
+
+tagIdList，标签id列表
+
+#### 简介
+
+批量删除文章，其中需要判断分类下有没有其他的文章绑定。需要加到操作日志中去`@OptLog(optType = REMOVE)`
+
+#### 实现细节
+
+1. 判断有没有文章绑定有，种类用in来判断。
+
+   ```java
+   // 查询标签下是否有文章
+   Integer count = articleTagDao.selectCount(new LambdaQueryWrapper<ArticleTag>()
+                                             .in(ArticleTag::getTagId, tagIdList));
+   if (count > 0) {
+       throw new AppException("删除失败，该标签下存在文章");
+   }
+   ```
+
+   
+
+2. deleteBatchIds
+
+   ```java
+   tagDao.deleteBatchIds(tagIdList);
+   ```
+
    
