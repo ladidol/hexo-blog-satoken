@@ -29,22 +29,22 @@ public class PageServiceImpl extends ServiceImpl<PageMapper, Page> implements Pa
     @Autowired
     private PageMapper pageDao;
 
-//    @Transactional(rollbackFor = Exception.class)
-//    @Override
-//    public void saveOrUpdatePage(PageVO pageVO) {
-//        Page page = BeanCopyUtils.copyObject(pageVO, Page.class);
-//        this.saveOrUpdate(page);
-//        // 删除缓存
-//        redisService.del(PAGE_COVER);
-//    }
-//
-//    @Transactional(rollbackFor = Exception.class)
-//    @Override
-//    public void deletePage(Integer pageId) {
-//        pageDao.deleteById(pageId);
-//        // 删除缓存
-//        redisService.del(PAGE_COVER);
-//    }
+    @Transactional(rollbackFor = Exception.class)
+    @Override
+    public void saveOrUpdatePage(PageVO pageVO) {
+        Page page = BeanCopyUtils.copyObject(pageVO, Page.class);
+        this.saveOrUpdate(page);
+        // 删除缓存
+        redisService.del(PAGE_COVER);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    @Override
+    public void deletePage(Integer pageId) {
+        pageDao.deleteById(pageId);
+        // 删除缓存
+        redisService.del(PAGE_COVER);
+    }
 
     @Transactional(rollbackFor = Exception.class)
     @Override

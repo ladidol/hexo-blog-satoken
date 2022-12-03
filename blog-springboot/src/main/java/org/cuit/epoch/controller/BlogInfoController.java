@@ -1,13 +1,18 @@
 package org.cuit.epoch.controller;
 
 import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiImplicitParam;
 import io.swagger.annotations.ApiOperation;
 import org.cuit.epoch.dto.blog.BlogHomeInfoDTO;
+import org.cuit.epoch.enums.FilePathEnum;
 import org.cuit.epoch.service.BlogInfoService;
+import org.cuit.epoch.strategy.context.UploadStrategyContext;
 import org.cuit.epoch.util.Result;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 /**
  * @author: ladidol
@@ -21,8 +26,8 @@ public class BlogInfoController {
     private BlogInfoService blogInfoService;
 //    @Autowired
 //    private WebSocketServiceImpl webSocketService;
-//    @Autowired
-//    private UploadStrategyContext uploadStrategyContext;
+    @Autowired
+    private UploadStrategyContext uploadStrategyContext;
 
     /**
      * 查看博客信息
@@ -46,18 +51,18 @@ public class BlogInfoController {
 //        return Result.ok(blogInfoService.getBlogBackInfo());
 //    }
 
-//    /**
-//     * 上传博客配置图片
-//     *
-//     * @param file 文件
-//     * @return {@link Result<String>} 博客配置图片
-//     */
-//    @ApiOperation(value = "上传博客配置图片")
-//    @ApiImplicitParam(name = "file", value = "图片", required = true, dataType = "MultipartFile")
-//    @PostMapping("/admin/config/images")
-//    public Result<String> savePhotoAlbumCover(MultipartFile file) {
-//        return Result.ok(uploadStrategyContext.executeUploadStrategy(file, FilePathEnum.CONFIG.getPath()));
-//    }
+    /**
+     * 上传博客配置图片
+     *
+     * @param file 文件
+     * @return {@link Result<String>} 博客配置图片
+     */
+    @ApiOperation(value = "上传博客配置图片")
+    @ApiImplicitParam(name = "file", value = "图片", required = true, dataType = "MultipartFile")
+    @PostMapping("/admin/config/images")
+    public Result<String> savePhotoAlbumCover(MultipartFile file) {
+        return Result.ok(uploadStrategyContext.executeUploadStrategy(file, FilePathEnum.CONFIG.getPath()));
+    }
 //
 //    /**
 //     * 更新网站配置
