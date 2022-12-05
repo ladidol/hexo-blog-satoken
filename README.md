@@ -3188,4 +3188,172 @@ tagIdList，标签id列表
    tagDao.deleteBatchIds(tagIdList);
    ```
 
+
+
+
+## 页面模块
+
+### 1）保存或更新页面
+
+#### 参数
+
+```json
+{
+  "id": {保存默认为空，更新就会带有id},
+  "pageCover": {封面url},
+  "pageLabel": {页面标签，前端要用的},
+  "pageName": {页面名字}
+}
+```
+
+
+
+#### 简介
+
+就直接保存页面对象
+
+#### 实现细节
+
+1. 这里就没有去重判断了
+
+   ```java
+   @Transactional(rollbackFor = Exception.class)
+   @Override
+   public void saveOrUpdatePage(PageVO pageVO) {
+       Page page = BeanCopyUtils.copyObject(pageVO, Page.class);
+       this.saveOrUpdate(page);
+       // 删除缓存
+       redisService.del(PAGE_COVER);
+   }
    
+   ```
+
+2. 为了加快博客访问速度，我们将页面基本信息放到了redis中了，删除了就更新一下redis吧。
+
+### 2）删除用户id
+
+#### 参数
+
+pageId
+
+#### 简介
+
+通过页面id来删除页面
+
+#### 实现细节
+
+1. ```java
+   @Transactional(rollbackFor = Exception.class)
+   @Override
+   public void deletePage(Integer pageId) {
+       pageDao.deleteById(pageId);
+       // 删除缓存
+       redisService.del(PAGE_COVER);
+   }
+   ```
+
+2. 同样要更新redis
+
+
+
+### 3）获取页面列表
+
+#### 参数
+
+无。
+
+#### 简介
+
+不需要分页查询，直接查全部就行
+
+#### 实现细节
+
+1. 查找缓存信息，不存在则从mysql读取，更新缓存
+
+   ```java
+   List<PageVO> pageVOList;
+   // 查找缓存信息，不存在则从mysql读取，更新缓存
+   Object pageList = redisService.get(PAGE_COVER);
+   ```
+
+2. 存在缓存：用了alibaba的fastjson，真好
+
+   ```java
+   pageVOList = JSON.parseObject(pageList.toString(), List.class);
+   ```
+
+3. 不存在缓存：从数据库中拿
+
+   ```java
+   pageVOList = BeanCopyUtils.copyList(pageDao.selectList(null), PageVO.class);
+   redisService.set(PAGE_COVER, JSON.toJSONString(pageVOList));
+   ```
+
+
+
+
+## 日志模块
+
+### 1）查看操作日志
+
+#### 参数
+
+size+current+description_key_word+name_key_word
+
+
+
+#### 简介
+
+通过对简介和名字的模糊查询
+
+#### 实现细节
+
+1. 用页面返回
+
+   ```java
+   Page<OperationLog> page = new Page<>(PageUtils.getCurrent(), PageUtils.getSize());
+   ```
+
+2. 通过mp的service层自带方法进行分页查询
+
+   ```java
+   // 查询日志列表
+   Page<OperationLog> operationLogPage = this.page(page, new LambdaQueryWrapper<OperationLog>()
+                                                   .like(StringUtils.isNotBlank(conditionVO.getKeywords()), OperationLog::getOptModule, conditionVO.getKeywords())
+                                                   .or()
+                                                   .like(StringUtils.isNotBlank(conditionVO.getKeywords()), OperationLog::getOptDesc, conditionVO.getKeywords())
+                                                   .orderByDesc(OperationLog::getId));
+   ```
+
+3. 包装返回、
+
+   ```java
+   List<OperationLogDTO> operationLogDTOList = BeanCopyUtils.copyList(operationLogPage.getRecords(), OperationLogDTO.class);
+   return new PageResult<>(operationLogDTOList, (int) operationLogPage.getTotal());
+   ```
+
+### 2）删除日志
+
+#### 参数
+
+日志id链表
+
+#### 简介
+
+就直接保存页面对象
+
+#### 实现细节
+
+1. 直接service层的removeByIds
+
+   ```java
+   @ApiOperation(value = "删除操作日志")
+   @DeleteMapping("/admin/operation/logs")
+   public Result<?> deleteOperationLogs(@RequestBody List<Integer> logIdList) {
+       operationLogService.removeByIds(logIdList);
+       return Result.ok();
+   }
+   ```
+
+
+
