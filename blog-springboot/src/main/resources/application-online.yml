@@ -7,7 +7,7 @@ sa-token:
   # token名称 (同时也是cookie名称)
   token-name: xiaoxiao-token
   # token有效期，单位s 默认30天, -1代表永不过期
-  timeout: 2592000
+  timeout: 36000 #10小时
   # token临时有效期 (指定时间内无操作就视为token过期) 单位: 秒
   activity-timeout: -1
   # 是否允许同一账号并发登录 (为true时允许一起登录, 为false时新登录挤掉旧登录)
@@ -17,7 +17,7 @@ sa-token:
   # token风格
   token-style: uuid
   # 是否输出操作日志
-  is-log: false
+  is-log: true
 
 spring:
   # redis配置
@@ -25,9 +25,9 @@ spring:
     # Redis数据库索引（默认为0）
     database: 0
     # Redis服务器地址
-    host:
+    host: #ip地址
     # Redis服务器连接端口
-    port:
+    port: #端口号
     # Redis服务器连接密码（默认为空）
     password:
     # 连接超时时间
@@ -42,13 +42,45 @@ spring:
         max-idle: 10
         # 连接池中的最小空闲连接
         min-idle: 0
+  # mq配置
+  rabbitmq:
+    host: #ip地址
+    port: #端口号
+    username: guest
+    password: guest
+    listener:
+      simple:
+        retry:
+          enabled: true
+          max-attempts: 3 #最大重试次数
+          initial-interval: 3000 #重试间隔时间（单位毫秒）
+  # 邮箱配置
+  mail:
+    host: smtp.qq.com
+    username: #qq邮箱
+    password: #邮箱配置
+    default-encoding: UTF-8
+    port: 587
+    properties:
+      mail:
+      smtp:
+      auth: true
+      socketFactory:
+      class: javax.net.ssl.SSLSocketFactory
+  # 上传图片大小限制
+  servlet:
+    multipart:
+      max-file-size: 100MB
+      max-request-size:  100MB
+
   datasource:
-    type: com.zaxxer.hikari.HikariDataSource
+    #    type: com.zaxxer.hikari.HikariDataSource
+    type: com.alibaba.druid.pool.DruidDataSource
     driver-class-name: com.mysql.cj.jdbc.Driver
     #    url: jdbc:mysql://localhost:3306/cloud_disk?useSSL=false&useUnicode=true&characterEncoding=utf-8&serverTimezone=GMT%2B8&allowPublicKeyRetrieval=true
-    url: jdbc:mysql:///new_blog?serverTimezone=Asia/Shanghai&allowMultiQueries=true
-    username:
-    password:
+    url: jdbc:mysql://数据库IP地址/new_blog?serverTimezone=Asia/Shanghai&allowMultiQueries=true
+    username: #账号
+    password: #数据库密码
     druid:
       initialSize: 10   #初始化连接个数
       minIdle: 10       #最小空闲连接个数
@@ -70,6 +102,49 @@ spring:
 mybatis-plus:
   mapper-locations: classpath:mapper/*.xml
   configuration:
-    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    #    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
     map-underscore-to-camel-case: true
 
+# 上传模式 可选 oss或local  （http://和最后的/一定不能去！！！）
+upload:
+  mode: oss
+  local:
+    # nginx映射本地文件路径，无域名则为 ip:83
+    url: http://localhost:8888/
+    # 本地文件存储路径
+    path: /usr/local/upload/
+  oss:
+    url: http://dev-myblog.oss-cn-hangzhou.aliyuncs.com/
+    endpoint: oss-cn-hangzhou.aliyuncs.com
+    accessKeyId: #阿里云配置
+    accessKeySecret: #阿里云配置
+    bucketName: #阿里云配置
+  cos:
+    url: http://Bucket域名/
+    secretId: cos的secretId
+    secretKey: cos的secretKey
+    region: cos的region
+    bucketName: cos的bucketName
+
+
+#第三方配置信息
+qq:
+  app-id: QQ APPID
+  check-token-url: https://graph.qq.com/oauth2.0/me?access_token={access_token}
+  user-info-url: https://graph.qq.com/user/get_user_info?openid={openid}&access_token={access_token}&oauth_consumer_key={oauth_consumer_key}
+
+weibo:
+  app-id: #web第三方配置
+  app-secret: #web第三方配置
+  grant-type: #web第三方配置
+  redirect-url: #web第三方配置
+  #获取用户
+  access-token-url: https://api.weibo.com/oauth2/access_token
+  #获取用户昵称和头像url的
+  user-info-url: https://api.weibo.com/2/users/show.json?uid={uid}&access_token={access_token}
+
+
+# 设置root级别
+logging:
+  level:
+    root: info
