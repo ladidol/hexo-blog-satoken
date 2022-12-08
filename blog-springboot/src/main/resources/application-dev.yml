@@ -74,7 +74,8 @@ spring:
       max-request-size:  100MB
 
   datasource:
-    type: com.zaxxer.hikari.HikariDataSource
+#    type: com.zaxxer.hikari.HikariDataSource
+    type: com.alibaba.druid.pool.DruidDataSource
     driver-class-name: com.mysql.cj.jdbc.Driver
     #    url: jdbc:mysql://localhost:3306/cloud_disk?useSSL=false&useUnicode=true&characterEncoding=utf-8&serverTimezone=GMT%2B8&allowPublicKeyRetrieval=true
     url: jdbc:mysql://47.108.188.92:4406/new_blog?serverTimezone=Asia/Shanghai&allowMultiQueries=true
@@ -126,7 +127,7 @@ upload:
     bucketName: cos的bucketName
 
 
-#第三方配置信息 todo 这里qq开发者信息没有填写，网站不允许申请！，值得注意的是qq和微博的第三方登录都需要在前端/src/asserts/js/config.js中配置一下
+#第三方配置信息
 qq:
   app-id: QQ APPID
   check-token-url: https://graph.qq.com/oauth2.0/me?access_token={access_token}

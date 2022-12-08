@@ -21,7 +21,7 @@ public class Knife4jConfig {
     public Docket createRestApi() {
         return new Docket(DocumentationType.SWAGGER_2)
                 .protocols(Collections.singleton("https"))
-                .host("https://blog.ladidol.top")
+                .host("http://blog.ladidol.top")
                 .apiInfo(apiInfo())
                 .select()
                 .apis(RequestHandlerSelectors.basePackage("org.cuit.epoch.controller"))
@@ -34,7 +34,7 @@ public class Knife4jConfig {
                 .title("博客api文档")
                 .description("sa-token_springboot+vue开发的博客项目")
                 .contact(new Contact("Ladidol", "https://github.com/ladidol", "599426945@qq.com"))
-                .termsOfServiceUrl("https://blog.ladidol.top/api")
+                .termsOfServiceUrl("http://blog.ladidol.top/api")
                 .version("1.0")
                 .build();
     }

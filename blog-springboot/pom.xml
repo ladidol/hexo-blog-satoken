@@ -67,12 +67,19 @@
 
 
         <!--=====================================一些工具等 依赖部分==================================-->
+        <!--mysql驱动-->
         <dependency>
             <groupId>mysql</groupId>
             <artifactId>mysql-connector-java</artifactId>
             <scope>runtime</scope>
         </dependency>
-
+        <!--druid连接池-->
+        <dependency>
+            <groupId>com.alibaba</groupId>
+            <artifactId>druid-spring-boot-starter</artifactId>
+            <version>1.2.8</version>
+        </dependency>
+        <!--lombok-->
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
@@ -158,6 +165,15 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-configuration-processor</artifactId>
             <optional>true</optional>
+        </dependency>
+
+
+        <!--=====================================测试 部分==================================-->
+
+        <dependency>
+            <groupId>com.xincheck</groupId>
+            <artifactId>duplicate-check</artifactId>
+            <version>0.5.8</version>
         </dependency>
 
     </dependencies>

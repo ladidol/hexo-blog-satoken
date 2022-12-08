@@ -3357,3 +3357,458 @@ size+current+description_key_word+name_key_word
 
 
 
+## 相册模块
+
+### 1）保存或更新相册
+
+#### 参数
+
+```java
+{
+  "albumCover": {相册封面url},
+  "albumDesc": {相册简介},
+  "albumName": {相册名字},
+  "id": {id},
+  "status": {是否隐藏}
+}
+```
+
+#### 简介
+
+保存or更新相册信息，这里的处理依旧是需要判断重复性，用了前面都用过的方法
+
+#### 实现细节
+
+1. 通过查询判断项目名是否已经存在
+
+   ```java
+   PhotoAlbum album = photoAlbumDao.selectOne(new LambdaQueryWrapper<PhotoAlbum>()
+                                              .select(PhotoAlbum::getId)
+                                              .eq(PhotoAlbum::getAlbumName, photoAlbumVO.getAlbumName()));
+   if (Objects.nonNull(album) && !album.getId().equals(photoAlbumVO.getId())) {
+       throw new AppException("相册名已存在");
+   }
+   ```
+
+2. 然后调用saveOrUpdate方法，万能
+
+   ```java
+   PhotoAlbum photoAlbum = BeanCopyUtils.copyObject(photoAlbumVO, PhotoAlbum.class);
+   this.saveOrUpdate(photoAlbum);
+   ```
+
+
+
+### 2）上传相册封面
+
+#### 参数
+
+MultipartFile文件
+
+#### 简介
+
+上传文件，返回给前端url，方便前端调用`保存更新相册`接口
+
+#### 实现细节
+
+1. 直接调用上传策略上下文中的上传方法，同时标记这是PHOTO模块里面的的图片
+
+   ```java
+   return Result.ok(uploadStrategyContext.executeUploadStrategy(file, FilePathEnum.PHOTO.getPath()));
+   ```
+
+
+
+
+
+### 3）后台获取相册列表信息
+
+#### 参数
+
+无参数
+
+#### 简介
+
+后台查看相册列表，就直接将全部信息返给前段就行。简单实现。
+
+#### 实现细节
+
+1. ```java
+   List<PhotoAlbum> photoAlbumList = photoAlbumDao.selectList(new LambdaQueryWrapper<PhotoAlbum>()
+                                                              .eq(PhotoAlbum::getIsDelete, FALSE));
+   return BeanCopyUtils.copyList(photoAlbumList, PhotoAlbumDTO.class);
+   ```
+
+
+
+### 4）后台根据id获取相册详细信息
+
+#### 参数
+
+albumId相册id
+
+#### 简介
+
+后台查看相册指定相册的详细信息，包括照片数量。
+
+#### 实现细节
+
+1. 查询相册信息
+
+   ```java
+   PhotoAlbum photoAlbum = photoAlbumDao.selectById(albumId);
+   ```
+
+2. 查询照片数量（这里用到了照片模块的部分方法）
+
+   ```java
+   // 查询照片数量
+   Integer photoCount = photoDao.selectCount(new LambdaQueryWrapper<Photo>()
+                                             .eq(Photo::getAlbumId, albumId)
+                                             .eq(Photo::getIsDelete, FALSE));
+   PhotoAlbumBackDTO album = BeanCopyUtils.copyObject(photoAlbum, PhotoAlbumBackDTO.class);
+   ```
+
+3. 更新album中的photoCount字段
+
+   ```java
+   album.setPhotoCount(photoCount);
+   return album;
+   ```
+
+
+
+### 5）根据id删除相册
+
+#### 参数
+
+albumId相册id
+
+#### 简介
+
+通过id删除相册
+
+#### 实现细节
+
+1. 先看看相册下面有没有照片
+
+   ```java
+   // 查询照片数量
+   Integer count = photoDao.selectCount(new LambdaQueryWrapper<Photo>()
+                                        .eq(Photo::getAlbumId, albumId));
+   ```
+
+2. 如果`count>0`则
+
+   ```java
+   // 若相册下存在照片则逻辑删除相册
+   photoAlbumDao.updateById(PhotoAlbum.builder()
+                            .id(albumId)
+                            .isDelete(TRUE)
+                            .build());
+   // 再删除照片
+   photoDao.update(new Photo(), new LambdaUpdateWrapper<Photo>()
+                   .set(Photo::getIsDelete, TRUE)
+                   .eq(Photo::getAlbumId, albumId));
+   ```
+
+3. 否则
+
+   ```java
+   // 若相册下不存在照片则直接删除
+   photoAlbumDao.deleteById(albumId);
+   ```
+
+
+
+
+
+### 6）前台获取相册列表
+
+#### 参数
+
+无
+
+#### 简介
+
+前台获取公开相册列表，根据id排序
+
+#### 实现细节
+
+1. ```java
+   // 查询相册列表
+   List<PhotoAlbum> photoAlbumList = photoAlbumDao.selectList(new LambdaQueryWrapper<PhotoAlbum>()
+                                                              .eq(PhotoAlbum::getStatus, PUBLIC.getStatus())
+                                                              .eq(PhotoAlbum::getIsDelete, FALSE)
+                                                              .orderByDesc(PhotoAlbum::getId));
+   return BeanCopyUtils.copyList(photoAlbumList, PhotoAlbumDTO.class);
+   ```
+
+
+
+
+
+## 照片模块
+
+### 1）后台根据相册id获取照片列表
+
+#### 参数
+
+```java
+{
+  "albumId": {相册封面url},
+  "isDelete": {是否已经删除的}
+}
+```
+
+#### 简介
+
+通过相册id查询隶属于它的照片，同时根据isDelete属性来判断查询`未删除的照片`or`逻辑删除的照片`
+
+#### 实现细节
+
+1. 直接selectPage查询
+
+   ```java
+   // 查询照片列表
+   Page<Photo> page = new Page<>(PageUtils.getCurrent(), PageUtils.getSize());
+   Page<Photo> photoPage = photoDao.selectPage(page, new LambdaQueryWrapper<Photo>()
+                                               .eq(Objects.nonNull(condition.getAlbumId()), Photo::getAlbumId, condition.getAlbumId())
+                                               .eq(Photo::getIsDelete, condition.getIsDelete())
+                                               .orderByDesc(Photo::getId)
+                                               .orderByDesc(Photo::getUpdateTime));
+   ```
+
+2. 封装返回
+
+   ```java
+   List<PhotoBackDTO> photoList = BeanCopyUtils.copyList(photoPage.getRecords(), PhotoBackDTO.class);
+   return new PageResult<>(photoList, (int) photoPage.getTotal());
+   ```
+
+
+
+### 2）更新照片信息
+
+#### 参数
+
+```java
+{
+  "albumId": {相册封面url},
+  "isDelete": {是否已经删除的}
+}
+```
+
+#### 简介
+
+根据照片id更新就行
+
+#### 实现细节
+
+1. 根据id更新信息就行了
+
+   ```java
+   Photo photo = BeanCopyUtils.copyObject(photoInfoVO, Photo.class);
+   photoDao.updateById(photo);
+   ```
+
+   
+
+
+
+### 3）保存照片信息
+
+#### 参数
+
+```java
+{
+  "albumId": {保存于的相册id},
+  "photoIdList": {保存操作是为空的},
+  "photoUrlList": {url集合}
+}
+```
+
+#### 简介
+
+通过相册id保存全部url于其麾下
+
+#### 实现细节
+
+1. 通过stream操作，将每一个url分别用一个photo对象来装，同时赋值同样的albumId
+
+   ```java
+   List<Photo> photoList = photoVO.getPhotoUrlList().stream().map(item -> Photo.builder()
+                                                                  .albumId(photoVO.getAlbumId())
+                                                                  .photoName(IdWorker.getIdStr())
+                                                                  .photoSrc(item)
+                                                                  .build())
+       .collect(Collectors.toList());
+   ```
+
+2. 然后调用批量插入`this.saveBatch(photoList);`
+
+   ```java
+   this.saveBatch(photoList);
+   ```
+
+
+
+### 4）移动照片到指定相册
+
+#### 参数
+
+```java
+{
+  "albumId": {目的相册id},
+  "photoIdList": {更新操作存在id},
+  "photoUrlList": {是不用传的}
+}
+```
+
+#### 简介
+
+就是通过photoid修改每一个id的albumId就行勒
+
+#### 实现细节
+
+1. 为每一个photo对象赋值新的albumId
+
+   ```java
+   List<Photo> photoList = photoVO.getPhotoIdList().stream().map(item -> Photo.builder()
+                                                                 .id(item)
+                                                                 .albumId(photoVO.getAlbumId())
+                                                                 .build())
+       .collect(Collectors.toList());
+   ```
+
+2. 根据id批量插入
+
+   ```java
+   this.updateBatchById(photoList);
+   ```
+
+   
+
+
+
+
+
+### 5）更新照片删除状态（逻辑删除和恢复）
+
+#### 参数
+
+```java
+{
+  "idList": {需要修改的照片id},
+  "isDelete": {删除：1，恢复：0}
+}
+```
+
+#### 简介
+
+根据照片ID进行删除或者恢复。如果是恢复操作，需要同时判断相册需不需要恢复！！！
+
+#### 实现细节
+
+1. 先更新每个照片的状态
+
+   ```java
+   // 更新照片状态
+   List<Photo> photoList = deleteVO.getIdList().stream().map(item -> Photo.builder()
+   .id(item)
+   .isDelete(deleteVO.getIsDelete())
+   .build())
+   .collect(Collectors.toList());
+   this.updateBatchById(photoList);
+   ```
+
+2. 判断是不是恢复操作，如果是就开始判断相册是不是需要恢复
+
+   ```java
+   // 若恢复照片所在的相册已删除，恢复相册
+   if (deleteVO.getIsDelete().equals(FALSE)) {
+       List<PhotoAlbum> photoAlbumList = photoDao.selectList(new LambdaQueryWrapper<Photo>()
+                                                             .select(Photo::getAlbumId)
+                                                             .in(Photo::getId, deleteVO.getIdList())
+                                                             .groupBy(Photo::getAlbumId))
+           .stream()
+           .map(item -> PhotoAlbum.builder()
+                .id(item.getAlbumId())
+                .isDelete(FALSE)
+                .build())
+           .collect(Collectors.toList());
+       photoAlbumService.updateBatchById(photoAlbumList);
+   }
+   ```
+
+   
+
+
+
+### 6）删除照片
+
+#### 参数
+
+photoIdList集合
+
+#### 简介
+
+直接通过photoId集合将回收站中图片直接物理删除
+
+#### 实现细节
+
+1. ```java
+   photoDao.deleteBatchIds(photoIdList);
+   ```
+
+   
+
+
+
+### 7）前台根据相册id查看照片列表
+
+#### 参数
+
+id
+
+#### 简介
+
+通过albumId查询照片列表
+
+#### 实现细节
+
+1. 先判断相册是不是存在
+
+   ```java
+   // 查询相册信息
+   PhotoAlbum photoAlbum = photoAlbumService.getOne(new LambdaQueryWrapper<PhotoAlbum>()
+                                                    .eq(PhotoAlbum::getId, albumId)
+                                                    .eq(PhotoAlbum::getIsDelete, FALSE)
+                                                    .eq(PhotoAlbum::getStatus, PUBLIC.getStatus()));
+   if (Objects.isNull(photoAlbum)) {
+       throw new AppException("相册不存在");
+   }
+   ```
+
+2. 只查询照片url，同时封装相册名字相册图片ulr和全部图片的url集合
+
+   ```java
+   // 查询照片列表
+   Page<Photo> page = new Page<>(PageUtils.getCurrent(), PageUtils.getSize());
+   List<String> photoList = photoDao.selectPage(page, new LambdaQueryWrapper<Photo>()
+                                                .select(Photo::getPhotoSrc)
+                                                .eq(Photo::getAlbumId, albumId)
+                                                .eq(Photo::getIsDelete, FALSE)
+                                                .orderByDesc(Photo::getId))
+       .getRecords()
+       .stream()
+       .map(Photo::getPhotoSrc)
+       .collect(Collectors.toList());
+   return PhotoDTO.builder()
+       .photoAlbumCover(photoAlbum.getAlbumCover())
+       .photoAlbumName(photoAlbum.getAlbumName())
+       .photoList(photoList)
+       .build();
+   ```
+
+   
