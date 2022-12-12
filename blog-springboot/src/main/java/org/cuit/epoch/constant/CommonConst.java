@@ -1,4 +1,4 @@
-package org.cuit.epoch.enums;
+package org.cuit.epoch.constant;
 
 /**
  * @author: ladidol

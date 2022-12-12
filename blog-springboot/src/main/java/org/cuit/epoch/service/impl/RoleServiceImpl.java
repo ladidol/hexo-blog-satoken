@@ -9,7 +9,7 @@ import org.cuit.epoch.entity.Role;
 import org.cuit.epoch.entity.RoleMenu;
 import org.cuit.epoch.entity.RoleResource;
 import org.cuit.epoch.entity.UserRole;
-import org.cuit.epoch.enums.CommonConst;
+import org.cuit.epoch.constant.CommonConst;
 import org.cuit.epoch.exception.AppException;
 import org.cuit.epoch.handler.MySourceSafilterAuthStrategy;
 import org.cuit.epoch.mapper.RoleMapper;

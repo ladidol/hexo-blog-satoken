@@ -7,7 +7,7 @@ import org.cuit.epoch.dto.strategy.login.QQUserInfoDTO;
 import org.cuit.epoch.dto.strategy.login.SocialTokenDTO;
 import org.cuit.epoch.dto.strategy.login.SocialUserInfoDTO;
 import org.cuit.epoch.enums.LoginTypeEnum;
-import org.cuit.epoch.enums.SocialLoginConst;
+import org.cuit.epoch.constant.SocialLoginConst;
 import org.cuit.epoch.exception.AppException;
 import org.cuit.epoch.util.CommonUtils;
 import org.cuit.epoch.vo.strategy.login.QQLoginVO;
@@ -19,7 +19,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 
-import static org.cuit.epoch.enums.SocialLoginConst.*;
+import static org.cuit.epoch.constant.SocialLoginConst.*;
 import static org.cuit.epoch.enums.StatusCodeEnum.QQ_LOGIN_ERROR;
 
 /**

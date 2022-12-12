@@ -28,7 +28,7 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 
 import static org.cuit.epoch.enums.ArticleStatusEnum.PUBLIC;
-import static org.cuit.epoch.enums.CommonConst.FALSE;
+import static org.cuit.epoch.constant.CommonConst.FALSE;
 
 /**
  * @author: ladidol

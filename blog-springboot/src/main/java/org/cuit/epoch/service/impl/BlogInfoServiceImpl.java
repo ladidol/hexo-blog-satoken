@@ -18,10 +18,10 @@ import javax.servlet.http.HttpServletRequest;
 import java.util.*;
 
 import static org.cuit.epoch.enums.ArticleStatusEnum.PUBLIC;
-import static org.cuit.epoch.enums.CommonConst.DEFAULT_CONFIG_ID;
-import static org.cuit.epoch.enums.CommonConst.FALSE;
-import static org.cuit.epoch.enums.RedisPrefixConst.BLOG_VIEWS_COUNT;
-import static org.cuit.epoch.enums.RedisPrefixConst.WEBSITE_CONFIG;
+import static org.cuit.epoch.constant.CommonConst.DEFAULT_CONFIG_ID;
+import static org.cuit.epoch.constant.CommonConst.FALSE;
+import static org.cuit.epoch.constant.RedisPrefixConst.BLOG_VIEWS_COUNT;
+import static org.cuit.epoch.constant.RedisPrefixConst.WEBSITE_CONFIG;
 
 /**
  * @author: ladidol

@@ -15,7 +15,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import javax.validation.Valid;
 
-import static org.cuit.epoch.enums.OptTypeConst.UPDATE;
+import static org.cuit.epoch.constant.OptTypeConst.UPDATE;
 
 /**
  * @author: ladidol

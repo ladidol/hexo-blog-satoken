@@ -30,7 +30,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import static org.cuit.epoch.enums.RedisPrefixConst.*;
+import static org.cuit.epoch.constant.RedisPrefixConst.*;
 
 /**
  * @author: ladidol

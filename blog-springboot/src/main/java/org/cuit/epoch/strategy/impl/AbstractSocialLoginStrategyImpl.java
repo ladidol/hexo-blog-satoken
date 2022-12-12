@@ -31,9 +31,9 @@ import java.time.ZoneId;
 import java.util.Objects;
 import java.util.Set;
 
-import static org.cuit.epoch.enums.CommonConst.TRUE;
-import static org.cuit.epoch.enums.RedisPrefixConst.*;
-import static org.cuit.epoch.enums.RedisPrefixConst.USER_ONLINE;
+import static org.cuit.epoch.constant.CommonConst.TRUE;
+import static org.cuit.epoch.constant.RedisPrefixConst.*;
+import static org.cuit.epoch.constant.RedisPrefixConst.USER_ONLINE;
 import static org.cuit.epoch.enums.ZoneEnum.SHANGHAI;
 
 /**

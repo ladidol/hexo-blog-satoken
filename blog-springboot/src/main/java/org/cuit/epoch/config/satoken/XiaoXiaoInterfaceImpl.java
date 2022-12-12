@@ -10,7 +10,7 @@ import org.springframework.stereotype.Component;
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.cuit.epoch.enums.RedisPrefixConst.USER_ROLE;
+import static org.cuit.epoch.constant.RedisPrefixConst.USER_ROLE;
 
 /**
  * 自定义权限验证接口扩展

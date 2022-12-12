@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.*;
 import javax.validation.Valid;
 import java.util.List;
 
-import static org.cuit.epoch.enums.OptTypeConst.*;
+import static org.cuit.epoch.constant.OptTypeConst.*;
 
 /**
  * @author: ladidol

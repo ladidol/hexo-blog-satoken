@@ -25,8 +25,8 @@ import java.util.List;
 import java.util.Objects;
 
 import static org.cuit.epoch.enums.ArticleStatusEnum.PUBLIC;
-import static org.cuit.epoch.enums.CommonConst.FALSE;
-import static org.cuit.epoch.enums.CommonConst.TRUE;
+import static org.cuit.epoch.constant.CommonConst.FALSE;
+import static org.cuit.epoch.constant.CommonConst.TRUE;
 
 /**
  * @author: ladidol

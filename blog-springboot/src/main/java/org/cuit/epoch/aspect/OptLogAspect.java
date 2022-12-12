@@ -23,7 +23,7 @@ import javax.servlet.http.HttpServletRequest;
 import java.lang.reflect.Method;
 import java.util.Objects;
 
-import static org.cuit.epoch.enums.RedisPrefixConst.USER_INFO;
+import static org.cuit.epoch.constant.RedisPrefixConst.USER_INFO;
 
 /**
  * @author: ladidol

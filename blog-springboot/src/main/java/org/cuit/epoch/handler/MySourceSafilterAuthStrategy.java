@@ -5,7 +5,6 @@ import cn.dev33.satoken.stp.StpUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.cuit.epoch.dto.ResourceRoleDTO;
 import org.cuit.epoch.dto.UserDetailDTO;
-import org.cuit.epoch.dto.UserInfoDTO;
 import org.cuit.epoch.exception.AppException;
 import org.cuit.epoch.mapper.RoleMapper;
 import org.cuit.epoch.service.RedisService;
@@ -19,9 +18,8 @@ import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
-import static org.cuit.epoch.enums.RedisPrefixConst.USER_ONLINE;
+import static org.cuit.epoch.constant.RedisPrefixConst.USER_ONLINE;
 
 /**
  * @author: ladidol

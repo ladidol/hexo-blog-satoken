@@ -26,9 +26,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import static org.cuit.epoch.enums.CommonConst.COMPONENT;
-import static org.cuit.epoch.enums.CommonConst.TRUE;
-import static org.cuit.epoch.enums.RedisPrefixConst.USER_INFO;
+import static org.cuit.epoch.constant.CommonConst.COMPONENT;
+import static org.cuit.epoch.constant.CommonConst.TRUE;
+import static org.cuit.epoch.constant.RedisPrefixConst.USER_INFO;
 
 /**
  * @author: ladidol

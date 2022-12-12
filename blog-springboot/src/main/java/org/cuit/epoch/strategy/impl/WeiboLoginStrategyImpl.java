@@ -21,7 +21,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 
-import static org.cuit.epoch.enums.SocialLoginConst.*;
+import static org.cuit.epoch.constant.SocialLoginConst.*;
 import static org.cuit.epoch.enums.StatusCodeEnum.WEIBO_LOGIN_ERROR;
 
 /**

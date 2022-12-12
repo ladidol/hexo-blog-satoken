@@ -15,7 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Objects;
 
-import static org.cuit.epoch.enums.RedisPrefixConst.PAGE_COVER;
+import static org.cuit.epoch.constant.RedisPrefixConst.PAGE_COVER;
 
 /**
  * @author: ladidol

@@ -16,7 +16,7 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 
-import static org.cuit.epoch.enums.CommonConst.APPLICATION_JSON;
+import static org.cuit.epoch.constant.CommonConst.APPLICATION_JSON;
 
 /**
  * @author: ladidol

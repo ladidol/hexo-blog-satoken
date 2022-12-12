@@ -9,7 +9,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.util.Optional;
 
-import static org.cuit.epoch.enums.CommonConst.*;
+import static org.cuit.epoch.constant.CommonConst.*;
 
 /**
  * @author: ladidol

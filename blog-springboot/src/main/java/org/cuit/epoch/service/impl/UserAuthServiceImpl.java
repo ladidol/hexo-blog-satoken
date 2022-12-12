@@ -13,7 +13,7 @@ import org.cuit.epoch.dto.*;
 import org.cuit.epoch.entity.UserAuth;
 import org.cuit.epoch.entity.UserInfo;
 import org.cuit.epoch.entity.UserRole;
-import org.cuit.epoch.enums.CommonConst;
+import org.cuit.epoch.constant.CommonConst;
 
 import org.cuit.epoch.enums.LoginTypeEnum;
 import org.cuit.epoch.enums.RoleEnum;
@@ -50,12 +50,10 @@ import java.time.ZoneId;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import static org.cuit.epoch.enums.CommonConst.*;
-import static org.cuit.epoch.enums.MQPrefixConst.EMAIL_EXCHANGE;
-import static org.cuit.epoch.enums.RedisPrefixConst.*;
-import static org.cuit.epoch.enums.RedisPrefixConst.TALK_USER_LIKE;
-import static org.cuit.epoch.enums.RoleEnum.*;
-import static org.cuit.epoch.enums.RoleEnum.USER;
+import static org.cuit.epoch.constant.CommonConst.*;
+import static org.cuit.epoch.constant.MQPrefixConst.EMAIL_EXCHANGE;
+import static org.cuit.epoch.constant.RedisPrefixConst.*;
+import static org.cuit.epoch.constant.RedisPrefixConst.TALK_USER_LIKE;
 import static org.cuit.epoch.enums.UserAreaTypeEnum.*;
 import static org.cuit.epoch.enums.ZoneEnum.SHANGHAI;
 import static org.cuit.epoch.util.CommonUtils.checkEmail;
