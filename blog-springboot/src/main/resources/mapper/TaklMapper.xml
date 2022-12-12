@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.cuit.epoch.mapper.TalkMapper">
+
+    <select id="listTalks" resultType="org.cuit.epoch.dto.talk.TalkDTO">
+        SELECT
+            t.id,
+            nickname,
+            avatar,
+            content,
+            images,
+            t.is_top,
+            t.create_time
+        FROM
+            tb_talk t
+                JOIN tb_user_info ui ON t.user_id = ui.id
+        WHERE
+            t.status = 1
+        ORDER BY
+            t.is_top DESC,
+            t.id DESC
+            LIMIT #{current},#{size}
+    </select>
+
+    <select id="listBackTalks" resultType="org.cuit.epoch.dto.talk.TalkBackDTO">
+        SELECT
+        t.id,
+        nickname,
+        avatar,
+        content,
+        images,
+        t.is_top,
+        t.status,
+        t.create_time
+        FROM
+        tb_talk t
+        JOIN tb_user_info ui ON t.user_id = ui.id
+        <where>
+            <if test="condition.status != null">
+                t.status = #{condition.status}
+            </if>
+        </where>
+        ORDER BY
+        t.is_top DESC,
+        t.id DESC
+        LIMIT #{current},#{size}
+    </select>
+
+    <select id="getTalkById" resultType="org.cuit.epoch.dto.talk.TalkDTO">
+        SELECT
+            t.id,
+            nickname,
+            avatar,
+            content,
+            images,
+            t.create_time
+        FROM
+            tb_talk t
+                JOIN tb_user_info ui ON t.user_id = ui.id
+        WHERE
+            t.id = #{talkId}
+          AND t.status = 1
+    </select>
+
+
+    <select id="getBackTalkById" resultType="org.cuit.epoch.dto.talk.TalkBackDTO">
+        SELECT
+            t.id,
+            nickname,
+            avatar,
+            content,
+            images,
+            t.is_top,
+            t.status,
+            t.create_time
+        FROM
+            tb_talk t
+                JOIN tb_user_info ui ON t.user_id = ui.id
+        WHERE
+            t.id = #{talkId}
+    </select>
+
+</mapper>
