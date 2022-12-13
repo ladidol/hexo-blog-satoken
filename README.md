@@ -16,7 +16,7 @@ Sa-token的Session：
 > 3. Sa-Token支持Cookie、Header、body三个途径提交Token，而不是仅限于Cookie
 > 4. 由于不强依赖Cookie，所以只要将Token存储到不同的地方，便可以做到一个客户端同时登录多个账号
 
-
+注意搜索一下readme文档中的todo
 
 
 
@@ -3811,4 +3811,395 @@ id
        .build();
    ```
 
+
+## 说说模块
+
+### 1）查看首页说说（滚动展示）
+
+#### 参数
+
+无参数，默认请求十条说说数据
+
+#### 简介
+
+根据置顶、创建顺序返回前十个。
+
+#### 实现细节
+
+1. 直接查询selectList，很巧妙地是：istop字段1 or 0，直接降序排序就行，id降序也就代表最近创建。同时用到了mp的last方法：在最后添加了限制条数的条件。
+
+   ```java
+   // 查询最新10条说说
+   List<Talk> talks = talkDao.selectList(new LambdaQueryWrapper<Talk>()
+                              .eq(Talk::getStatus, TalkStatusEnum.PUBLIC.getStatus())
+                              .orderByDesc(Talk::getIsTop)
+                              .orderByDesc(Talk::getId)
+                              .last("limit 10"));
+   ```
+
+   这段代码sql等价于
+
+   ```sql
+   SELECT id,user_id,content,images,is_top,status,create_time,update_time 
+   FROM tb_talk 
+   WHERE (status = ?) 
+   ORDER BY is_top 
+   DESC,id DESC 
+   limit 10
+   ```
+
+2. 依旧是用stream操作来取代for循环，同时进行前200字节截取操作。
+
+   ```java
+   return  talks
+       .stream()
+       .map(item -> item.getContent().length() > 200 ? HTMLUtils.deleteHMTLTag(item.getContent().substring(0, 200)) : HTMLUtils.deleteHMTLTag(item.getContent()))
+       .collect(Collectors.toList());
+   ```
+
    
+
+### 2）查看说说链表 todo等评论模块写好了再弄一下吧。
+
+#### 参数
+
+无参数
+
+#### 简介
+
+通过相册id查询隶属于它的照片，同时根据isDelete属性来判断查询`未删除的照片`or`逻辑删除的照片`
+
+#### 实现细节
+
+1. 直接selectPage查询
+
+
+
+
+
+
+
+### 3）根据id查看说说
+
+#### 参数
+
+talkId
+
+#### 简介
+
+通过说说id，前台查看说说的基本信息
+
+#### 实现细节
+
+1. 依旧是常见的判空操作
+
+   ```java
+   // 查询说说信息
+   TalkDTO talkDTO = talkDao.getTalkById(talkId);
+   if (Objects.isNull(talkDTO)) {
+       throw new AppException("说说不存在");
+   }
+   ```
+
+   mapper层
+
+   ```xml
+       <select id="getTalkById" resultType="org.cuit.epoch.dto.talk.TalkDTO">
+           SELECT
+               t.id,
+               nickname,
+               avatar,
+               content,
+               images,
+               t.create_time
+           FROM
+               tb_talk t
+                   JOIN tb_user_info ui ON t.user_id = ui.id
+           WHERE
+               t.id = #{talkId}
+             AND t.status = 1
+       </select>
+   ```
+
+   
+
+2. 查看redis中该条说说的点赞数
+
+   ```java
+   // 查询说说点赞量
+   talkDTO.setLikeCount((Integer) redisService.hGet(TALK_LIKE_COUNT, talkId.toString()));
+   ```
+
+3. 转换图片url字段格式，因为存入数据库中的是`[url1,url2,url3]`的string形式，我们前端需要的到的url链表
+
+   ```java
+   // 转换图片格式
+   if (Objects.nonNull(talkDTO.getImages())) {
+       talkDTO.setImgList(
+           CommonUtils.castList(
+               //先解析成objectList，然后再转化成StringList
+               JSON.parseObject(talkDTO.getImages(), List.class),
+               String.class)
+       );
+   }
+   ```
+
+   
+
+
+
+### 4）点赞说说
+
+#### 参数
+
+talkId
+
+#### 简介
+
+通过talkId和登录用户loginId，将该角色点赞说说情况放到redis中存储
+
+![image-20221213005852699](https://figurebed-ladidol.oss-cn-chengdu.aliyuncs.com/img/202212130127896.png)
+
+#### 实现细节
+
+1. 判断该用户对于该说说是否已经点赞过了
+
+   ```java
+   // 判断是否点赞
+   String talkLikeKey = TALK_USER_LIKE + StpUtil.getLoginIdAsInt();
+   if (redisService.sIsMember(talkLikeKey, talkId)) {
+       // 点过赞则删除说说id
+       redisService.sRemove(talkLikeKey, talkId);
+       // 说说点赞量-1
+       redisService.hDecr(TALK_LIKE_COUNT, talkId.toString(), 1L);
+   } else {
+       // 未点赞则增加说说id
+       redisService.sAdd(talkLikeKey, talkId);
+       // 说说点赞量+1
+       redisService.hIncr(TALK_LIKE_COUNT, talkId.toString(), 1L);
+   }
+   ```
+
+   
+
+
+
+### 5）上传说说图片
+
+#### 参数
+
+图片文件
+
+#### 简介
+
+传入图片文件，直接通过上传策略上传文件并返回url就行了
+
+#### 实现细节
+
+1. ```java
+   return Result.ok(uploadStrategyContext.executeUploadStrategy(file, FilePathEnum.TALK.getPath()));
+   ```
+
+
+
+
+
+
+
+### 6）保存修改说说
+
+#### 参数
+
+```java
+{
+  "content": "说说内容",
+  "id": 说说id,
+  "images": "[图片url1，url2，url3，url4]",
+  "isTop": 1是置顶，0不是置顶,
+  "status": 1.公开 2.私密
+}
+```
+
+#### 简介
+
+登录用户保存自己的说说，但是只能是后台才能使用。
+
+#### 实现细节
+
+1. 说说内容可以重复，所以直接用MP的service层的方法就可以
+
+   ```java
+   Talk talk = BeanCopyUtils.copyObject(talkVO, Talk.class);
+   talk.setUserId(StpUtil.getLoginIdAsInt());
+   this.saveOrUpdate(talk);
+   ```
+
+   
+
+
+
+
+
+
+
+### 7）删除说说
+
+#### 参数
+
+talkIdList
+
+#### 简介
+
+通过id列表批量删除
+
+#### 实现细节
+
+1. 直接批量删除就行
+
+   ```java
+   talkDao.deleteBatchIds(talkIdList);
+   ```
+
+   
+
+
+
+
+
+
+
+### 8）查看后台说说列表
+
+#### 参数
+
+size+current+公开还是私密状态情况status
+
+#### 简介
+
+通过关键字进行分页查询+模糊查询
+
+#### 实现细节
+
+1. 可以判断一下是不是没有说说
+
+   ```java
+   // 查询说说总量
+   Integer count = talkDao.selectCount(new LambdaQueryWrapper<Talk>()
+                                       .eq(Objects.nonNull(conditionVO.getStatus()), Talk::getStatus, conditionVO.getStatus()));
+   if (count == 0) {
+       return new PageResult<>();
+   }
+   ```
+
+2. 依旧直接通过自定义sql方法访问就行了
+
+   ```java
+   // 分页查询说说
+   List<TalkBackDTO> talkDTOList = talkDao.listBackTalks(PageUtils.getLimitCurrent(), PageUtils.getSize(), conditionVO);
+   ```
+
+   mapper层
+
+   ```xml
+       <select id="listBackTalks" resultType="org.cuit.epoch.dto.talk.TalkBackDTO">
+           SELECT
+           t.id,
+           nickname,
+           avatar,
+           content,
+           images,
+           t.is_top,
+           t.status,
+           t.create_time
+           FROM
+           tb_talk t
+           JOIN tb_user_info ui ON t.user_id = ui.id
+           <where>
+               <if test="condition.status != null">
+                   t.status = #{condition.status}
+               </if>
+           </where>
+           ORDER BY
+           t.is_top DESC,
+           t.id DESC
+           LIMIT #{current},#{size}
+       </select>
+   ```
+
+3. 然后就是转换图片格式
+
+   ```java
+   talkDTOList.forEach(item -> {
+       // 转换图片格式
+       if (Objects.nonNull(item.getImages())) {
+           item.setImgList(CommonUtils.castList(JSON.parseObject(item.getImages(), List.class), String.class));
+       }
+   });
+   return new PageResult<>(talkDTOList, count);
+   ```
+
+
+
+### 9）根据id查看后台说说
+
+#### 参数
+
+talkId
+
+#### 简介
+
+通过talkId进行后台说说详细信息查询
+
+#### 实现细节
+
+1. 通过maper层自定的sql方法查询该说说的详细信息
+
+   ```java
+   TalkBackDTO talkBackDTO = talkDao.getBackTalkById(talkId);
+   ```
+
+   mapper层
+
+   ```xml
+       <select id="getBackTalkById" resultType="org.cuit.epoch.dto.talk.TalkBackDTO">
+           SELECT
+               t.id,
+               nickname,
+               avatar,
+               content,
+               images,
+               t.is_top,
+               t.status,
+               t.create_time
+           FROM
+               tb_talk t
+                   JOIN tb_user_info ui ON t.user_id = ui.id
+           WHERE
+               t.id = #{talkId}
+       </select>
+   ```
+
+2. 然后依旧是将String字段的images，转化成链表
+
+   ```java
+   // 转换图片格式
+   if (Objects.nonNull(talkBackDTO.getImages())) {
+       talkBackDTO.setImgList(CommonUtils.castList(JSON.parseObject(talkBackDTO.getImages(), List.class), String.class));
+   }
+   return talkBackDTO;
+   ```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
