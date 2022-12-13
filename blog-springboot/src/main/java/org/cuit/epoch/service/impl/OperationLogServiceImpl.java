@@ -4,7 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.StringUtils;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import org.cuit.epoch.controller.OperationLogService;
+import org.cuit.epoch.service.OperationLogService;
 import org.cuit.epoch.dto.log.OperationLogDTO;
 import org.cuit.epoch.entity.OperationLog;
 import org.cuit.epoch.mapper.OperationLogMapper;
