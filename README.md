@@ -20,6 +20,10 @@ Sa-token的Session：
 
 
 
+**补充总结模块：**可以在每一个业务模块上加一个总结，说一下需要干啥！
+
+
+
 
 
 ## 自定义架构模块
@@ -4191,13 +4195,164 @@ talkId
 
 
 
+## 留言模块
+
+### 1）添加留言
+
+#### 参数
+
+```json
+{
+  "avatar": {前端传过来},
+  "messageContent": {需要写的内容},
+  "nickname": {昵称},
+  "time": {弹幕移动速度，前端传给后端就行}
+}
+```
+
+#### 简介
+
+保存前台用户的留言，这里需要保存用户基本信息
+
+#### 实现细节
+
+1. 先判断是否需要审核
+
+   ```java
+   // 判断是否需要审核
+   Integer isReview = blogInfoService.getWebsiteConfig().getIsMessageReview();
+   ```
+
+2. 获取用户ip等信息
+
+   ```java
+   // 获取用户ip
+   String ipAddress = IpUtils.getIpAddress(request);
+   String ipSource = IpUtils.getIpSource(ipAddress);
+   ```
+
+3. 用entity实体类来封装自己
+
+   ```java
+   Message message = BeanCopyUtils.copyObject(messageVO, Message.class);
+   message.setMessageContent(HTMLUtils.filter(message.getMessageContent()));
+   message.setIpAddress(ipAddress);
+   message.setIsReview(isReview == TRUE ? FALSE : TRUE);
+   message.setIpSource(ipSource);
+   ```
+
+4. 直接插入
+
+   ```java
+   messageDao.insert(message);
+   ```
+
+### 2）前台查看留言列表
+
+#### 参数
+
+无参数
+
+#### 简介
+
+将数据库中的全部留言都查询出来，前端将会展示到留言屏幕上去。
+
+#### 实现细节
+
+1. 查询留言列表
+
+   ```java
+   // 查询留言列表
+   List<Message> messageList = messageDao.selectList(new LambdaQueryWrapper<Message>()
+                                                     .select(Message::getId, Message::getNickname, Message::getAvatar, Message::getMessageContent, Message::getTime)
+                                                     .eq(Message::getIsReview, TRUE));
+   ```
+
+2. 继续用copy工具类，转换list
+
+   ```java
+   return BeanCopyUtils.copyList(messageList, MessageDTO.class);
+   ```
 
 
 
+### 3）后台查看留言列表
+
+#### 参数
+
+size+current+关键字+是否正在被审核
+
+#### 简介
+
+更具前端传的参数，进行分页模糊查询，满足查询未审核和正在审核的留言列表。
+
+#### 实现细节
+
+1. 分页查询
+
+   ```java
+   // 分页查询留言列表
+   Page<Message> page = new Page<>(PageUtils.getCurrent(), PageUtils.getSize());
+   LambdaQueryWrapper<Message> messageLambdaQueryWrapper = new LambdaQueryWrapper<Message>()
+       .like(StringUtils.isNotBlank(condition.getKeywords()), Message::getNickname, condition.getKeywords())
+       .eq(Objects.nonNull(condition.getIsReview()), Message::getIsReview, condition.getIsReview())
+       .orderByDesc(Message::getId);
+   Page<Message> messagePage = messageDao.selectPage(page, messageLambdaQueryWrapper);
+   ```
+
+2. 转换成DTO
+
+   ```java
+   // 转换DTO
+   List<MessageBackDTO> messageBackDTOList = BeanCopyUtils.copyList(messagePage.getRecords(), MessageBackDTO.class);
+   return new PageResult<>(messageBackDTOList, (int) messagePage.getTotal());
+   ```
+
+   
+
+### 4）审核通过留言
+
+#### 参数
+
+idList+isReview
+
+#### 简介
+
+根据idList进行批量修改审核状态。
+
+#### 实现细节
+
+1. 先通过stream将初始化messageList
+
+   ```java
+   List<Message> messageList = reviewVO.getIdList().stream().map(item -> Message.builder()
+                                                     .id(item)
+                                                     .isReview(reviewVO.getIsReview())
+                                                     .build())
+       .collect(Collectors.toList());
+   ```
+
+   ```
+   this.updateBatchById(messageList);
+   ```
 
 
 
+### 5）删除留言
 
+#### 参数
+
+idList
+
+#### 简介
+
+直接批量删除就行
+
+#### 实现细节
+
+```java
+messageService.removeByIds(messageIdList);
+```
 
 
 
