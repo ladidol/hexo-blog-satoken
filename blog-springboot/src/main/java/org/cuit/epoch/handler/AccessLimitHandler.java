@@ -45,7 +45,7 @@ public class AccessLimitHandler implements HandlerInterceptor {
                     // 此操作代表获取该key对应的值自增1后的结果
                     long q = redisService.incrExpire(key, seconds);
                     if (q > maxCount) {
-                        render(httpServletResponse, Result.fail("请求过于频繁，请稍候再试"));
+                        render(httpServletResponse, Result.fail("请求过于频繁，请"+seconds+"秒后再试"));
                         log.warn(key + "请求次数超过每" + seconds + "秒" + maxCount + "次");
                         return false;
                     }
