@@ -6,45 +6,20 @@
       </v-icon>
       <div class="login-wrapper">
         <!-- 用户名 -->
-        <v-text-field
-          v-model="username"
-          label="邮箱号"
-          placeholder="请输入您的邮箱号"
-          clearable
-          @keyup.enter="register"
-        />
+        <v-text-field v-model="username" label="邮箱号" placeholder="请输入您的邮箱号" clearable @keyup.enter="register" />
         <!-- 验证码 -->
         <div class="mt-7 send-wrapper">
-          <v-text-field
-            maxlength="6"
-            v-model="code"
-            label="验证码"
-            placeholder="请输入6位验证码"
-            @keyup.enter="register"
-          />
+          <v-text-field maxlength="6" v-model="code" label="验证码" placeholder="请输入6位验证码" @keyup.enter="register" />
           <v-btn text small :disabled="flag" @click="sendCode">
             {{ codeMsg }}
           </v-btn>
         </div>
         <!-- 密码 -->
-        <v-text-field
-          v-model="password"
-          class="mt-7"
-          label="密码"
-          placeholder="请输入您的密码"
-          @keyup.enter="register"
-          :append-icon="show ? 'mdi-eye' : 'mdi-eye-off'"
-          :type="show ? 'text' : 'password'"
-          @click:append="show = !show"
-        />
+        <v-text-field v-model="password" class="mt-7" label="密码" placeholder="请输入您的密码" @keyup.enter="register"
+          :append-icon="show ? 'mdi-eye' : 'mdi-eye-off'" :type="show ? 'text' : 'password'"
+          @click:append="show = !show" />
         <!-- 注册按钮 -->
-        <v-btn
-          class="mt-7"
-          block
-          color="red"
-          style="color:#fff"
-          @click="register"
-        >
+        <v-btn class="mt-7" block color="red" style="color:#fff" @click="register">
           注册
         </v-btn>
         <!-- 登录 -->
@@ -58,7 +33,7 @@
 
 <script>
 export default {
-  data: function() {
+  data: function () {
     return {
       username: "",
       code: "",
@@ -76,28 +51,20 @@ export default {
     },
     sendCode() {
       const that = this;
-      // eslint-disable-next-line no-undef
-      var captcha = new TencentCaptcha(this.config.TENCENT_CAPTCHA, function(
-        res
-      ) {
-        if (res.ret === 0) {
-          //发送邮件
-          that.countDown();
-          that.axios
-            .get("/api/users/code", {
-              params: { username: that.username }
-            })
-            .then(({ data }) => {
-              if (data.flag) {
-                that.$toast({ type: "success", message: "发送成功" });
-              } else {
-                that.$toast({ type: "error", message: data.message });
-              }
-            });
-        }
-      });
-      // 显示验证码
-      captcha.show();
+      //发送邮件
+      that.countDown();
+      that.axios
+        .get("/api/users/code", {
+          params: { username: that.username }
+        })
+        .then(({ data }) => {
+          if (data.flag) {
+            that.$toast({ type: "success", message: "发送成功" });
+          } else {
+            that.$toast({ type: "error", message: data.message });
+          }
+        });
+
     },
     countDown() {
       this.flag = true;

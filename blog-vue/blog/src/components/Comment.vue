@@ -74,7 +74,7 @@
             <!-- 楼层 -->
             <span style="margin-right:10px">{{ count - index }}楼</span>
             <!-- 发表时间 -->
-            <span style="margin-right:10px">{{ item.createTime | date }}</span>
+            <span style="margin-right:10px">{{ item.createTime | time }}</span>
             <!-- 点赞 -->
             <span
               :class="isLike(item.id) + ' iconfont icondianzan'"
@@ -111,7 +111,7 @@
               <div class="comment-info">
                 <!-- 发表时间 -->
                 <span style="margin-right:10px">
-                  {{ reply.createTime | date }}
+                  {{ reply.createTime | time }}
                 </span>
                 <!-- 点赞 -->
                 <span

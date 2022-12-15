@@ -6,34 +6,16 @@
       </v-icon>
       <div class="login-wrapper">
         <!-- 用户名 -->
-        <v-text-field
-          v-model="email"
-          label="邮箱号"
-          placeholder="请输入您的邮箱号"
-          clearable
-          @keyup.enter="register"
-        />
+        <v-text-field v-model="email" label="邮箱号" placeholder="请输入您的邮箱号" clearable @keyup.enter="register" />
         <!-- 验证码 -->
         <div class="mt-7 send-wrapper">
-          <v-text-field
-            maxlength="6"
-            v-model="code"
-            label="验证码"
-            placeholder="请输入6位验证码"
-            @keyup.enter="register"
-          />
+          <v-text-field maxlength="6" v-model="code" label="验证码" placeholder="请输入6位验证码" @keyup.enter="register" />
           <v-btn text small :disabled="flag" @click="sendCode">
             {{ codeMsg }}
           </v-btn>
         </div>
         <!-- 按钮 -->
-        <v-btn
-          class="mt-7"
-          block
-          color="blue"
-          style="color:#fff"
-          @click="saveUserEmail"
-        >
+        <v-btn class="mt-7" block color="blue" style="color:#fff" @click="saveUserEmail">
           绑定
         </v-btn>
       </div>
@@ -43,7 +25,7 @@
 
 <script>
 export default {
-  data: function() {
+  data: function () {
     return {
       email: this.$store.state.email,
       code: "",
@@ -56,28 +38,19 @@ export default {
   methods: {
     sendCode() {
       const that = this;
-      // eslint-disable-next-line no-undef
-      var captcha = new TencentCaptcha(this.config.TENCENT_CAPTCHA, function(
-        res
-      ) {
-        if (res.ret === 0) {
-          //发送邮件
-          that.countDown();
-          that.axios
-            .get("/api/users/code", {
-              params: { username: that.email }
-            })
-            .then(({ data }) => {
-              if (data.flag) {
-                that.$toast({ type: "success", message: data.message });
-              } else {
-                that.$toast({ type: "error", message: data.message });
-              }
-            });
-        }
-      });
-      // 显示验证码
-      captcha.show();
+      //发送邮件
+      that.countDown();
+      that.axios
+        .get("/api/users/code", {
+          params: { username: that.email }
+        })
+        .then(({ data }) => {
+          if (data.flag) {
+            that.$toast({ type: "success", message: data.message });
+          } else {
+            that.$toast({ type: "error", message: data.message });
+          }
+        });
     },
     countDown() {
       this.flag = true;
