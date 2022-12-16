@@ -18,6 +18,19 @@ Sa-token的Session：
 
 注意搜索一下readme文档中的todo
 
+git常用命令：
+
+```bash
+git status -s #查看修改状况
+git add ..\README.md
+git commit -m '因为idea提交出问题，所以README.md文件就用git命令提交'
+git push
+```
+
+
+
+
+
 
 
 **补充总结模块：**可以在每一个业务模块上加一个总结，说一下需要干啥！
@@ -3863,7 +3876,7 @@ id
 
    
 
-### 2）查看说说链表 todo等评论模块写好了再弄一下吧。
+### 2）说说页查看全部说说
 
 #### 参数
 
@@ -3871,19 +3884,56 @@ id
 
 #### 简介
 
-通过相册id查询隶属于它的照片，同时根据isDelete属性来判断查询`未删除的照片`or`逻辑删除的照片`
+前台展示全部说说
 
 #### 实现细节
 
-1. 直接selectPage查询
+1. 特殊情况特殊处理，优化性能
 
+   ```java
+   // 查询说说总量
+   Integer count = talkDao.selectCount((new LambdaQueryWrapper<Talk>()
+           .eq(Talk::getStatus, TalkStatusEnum.PUBLIC.getStatus())));
+   if (count == 0) {
+       return new PageResult<>();
+   }
+   ```
 
+2. 分页查询说说，然后添加它的评论量和点赞量
 
+   ```java
+   // 分页查询说说
+   List<TalkDTO> talkDTOList = talkDao.listTalks(PageUtils.getLimitCurrent(), PageUtils.getSize());
+   ```
 
+   ```java
+   // 查询说说评论量
+   List<Integer> talkIdList = talkDTOList.stream()
+           .map(TalkDTO::getId)
+           .collect(Collectors.toList());
+   Map<Integer, Integer> commentCountMap = commentDao.listCommentCountByTopicIds(talkIdList)
+           .stream()
+           .collect(Collectors.toMap(CommentCountDTO::getId, CommentCountDTO::getCommentCount));
+   ```
 
+   ```java
+   // 查询说说点赞量
+   Map<String, Object> likeCountMap = redisService.hGetAll(TALK_LIKE_COUNT);
+   ```
 
+3. 封装说说列表
 
-
+   ```java
+   talkDTOList.forEach(item -> {
+       item.setLikeCount((Integer) likeCountMap.get(item.getId().toString()));
+       item.setCommentCount(commentCountMap.get(item.getId()));
+       // 转换图片格式
+       if (Objects.nonNull(item.getImages())) {
+           item.setImgList(CommonUtils.castList(JSON.parseObject(item.getImages(), List.class), String.class));
+       }
+   });
+   return new PageResult<>(talkDTOList, count);
+   ```
 
 
 
