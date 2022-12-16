@@ -43,16 +43,16 @@ public class TalkController {
         return Result.ok(talkService.listHomeTalks());
     }
 
-//    /**
-//     * 查看说说列表
-//     *
-//     * @return {@link Result< TalkDTO >}
-//     */
-//    @ApiOperation(value = "查看说说列表")
-//    @GetMapping("/talks")
-//    public Result<PageResult<TalkDTO>> listTalks() {
-//        return Result.ok(talkService.listTalks());
-//    }
+    /**
+     * 查看说说列表
+     *
+     * @return {@link Result< TalkDTO >}
+     */
+    @ApiOperation(value = "查看说说列表")
+    @GetMapping("/talks")
+    public Result<PageResult<TalkDTO>> listTalks() {
+        return Result.ok(talkService.listTalks());
+    }
 
     /**
      * 根据id查看说说

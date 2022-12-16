@@ -4,10 +4,13 @@ import cn.dev33.satoken.stp.StpUtil;
 import com.alibaba.fastjson.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import org.cuit.epoch.dto.comment.CommentCountDTO;
 import org.cuit.epoch.dto.talk.TalkBackDTO;
 import org.cuit.epoch.dto.talk.TalkDTO;
 import org.cuit.epoch.entity.Talk;
+import org.cuit.epoch.enums.TalkStatusEnum;
 import org.cuit.epoch.exception.AppException;
+import org.cuit.epoch.mapper.CommentMapper;
 import org.cuit.epoch.mapper.TalkMapper;
 import org.cuit.epoch.service.RedisService;
 import org.cuit.epoch.service.TalkService;
@@ -25,7 +28,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
-import org.cuit.epoch.enums.TalkStatusEnum;
 
 import static org.cuit.epoch.constant.RedisPrefixConst.TALK_LIKE_COUNT;
 import static org.cuit.epoch.constant.RedisPrefixConst.TALK_USER_LIKE;
@@ -40,8 +42,8 @@ public class TalkServiceImpl extends ServiceImpl<TalkMapper, Talk> implements Ta
     @Autowired
     private TalkMapper talkDao;
     
-//    @Autowired
-//    private CommentMapper commentDao;
+    @Autowired
+    private CommentMapper commentDao;
     @Autowired
     private RedisService redisService;
 
@@ -61,36 +63,36 @@ public class TalkServiceImpl extends ServiceImpl<TalkMapper, Talk> implements Ta
                 .collect(Collectors.toList());
     }
 
-    // TODO: 2022/12/12 这里也是展示说说列表，但是是，需要配合评论一起展示，可恶
-//    @Override
-//    public PageResult<TalkDTO> listTalks() {
-//        // 查询说说总量
-//        Integer count = talkDao.selectCount((new LambdaQueryWrapper<Talk>()
-//                .eq(Talk::getStatus, TalkStatusEnum.PUBLIC.getStatus())));
-//        if (count == 0) {
-//            return new PageResult<>();
-//        }
-//        // 分页查询说说
-//        List<TalkDTO> talkDTOList = talkDao.listTalks(PageUtils.getLimitCurrent(), PageUtils.getSize());
-//        // 查询说说评论量
-//        List<Integer> talkIdList = talkDTOList.stream()
-//                .map(TalkDTO::getId)
-//                .collect(Collectors.toList());
-//        Map<Integer, Integer> commentCountMap = commentDao.listCommentCountByTopicIds(talkIdList)
-//                .stream()
-//                .collect(Collectors.toMap(CommentCountDTO::getId, CommentCountDTO::getCommentCount));
-//        // 查询说说点赞量
-//        Map<String, Object> likeCountMap = redisService.hGetAll(TALK_LIKE_COUNT);
-//        talkDTOList.forEach(item -> {
-//            item.setLikeCount((Integer) likeCountMap.get(item.getId().toString()));
-//            item.setCommentCount(commentCountMap.get(item.getId()));
-//            // 转换图片格式
-//            if (Objects.nonNull(item.getImages())) {
-//                item.setImgList(CommonUtils.castList(JSON.parseObject(item.getImages(), List.class), String.class));
-//            }
-//        });
-//        return new PageResult<>(talkDTOList, count);
-//    }
+    // 2022/12/12 这里也是展示说说列表，但是是，需要配合评论一起展示，可恶
+    @Override
+    public PageResult<TalkDTO> listTalks() {
+        // 查询说说总量
+        Integer count = talkDao.selectCount((new LambdaQueryWrapper<Talk>()
+                .eq(Talk::getStatus, TalkStatusEnum.PUBLIC.getStatus())));
+        if (count == 0) {
+            return new PageResult<>();
+        }
+        // 分页查询说说
+        List<TalkDTO> talkDTOList = talkDao.listTalks(PageUtils.getLimitCurrent(), PageUtils.getSize());
+        // 查询说说评论量
+        List<Integer> talkIdList = talkDTOList.stream()
+                .map(TalkDTO::getId)
+                .collect(Collectors.toList());
+        Map<Integer, Integer> commentCountMap = commentDao.listCommentCountByTopicIds(talkIdList)
+                .stream()
+                .collect(Collectors.toMap(CommentCountDTO::getId, CommentCountDTO::getCommentCount));
+        // 查询说说点赞量
+        Map<String, Object> likeCountMap = redisService.hGetAll(TALK_LIKE_COUNT);
+        talkDTOList.forEach(item -> {
+            item.setLikeCount((Integer) likeCountMap.get(item.getId().toString()));
+            item.setCommentCount(commentCountMap.get(item.getId()));
+            // 转换图片格式
+            if (Objects.nonNull(item.getImages())) {
+                item.setImgList(CommonUtils.castList(JSON.parseObject(item.getImages(), List.class), String.class));
+            }
+        });
+        return new PageResult<>(talkDTOList, count);
+    }
 
     @Override
     public TalkDTO getTalkById(Integer talkId) {

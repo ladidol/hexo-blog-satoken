@@ -29,7 +29,7 @@ public interface TalkService extends IService<Talk> {
      *
      * @return {@link PageResult <TalkDTO>} 说说列表
      */
-//    PageResult<TalkDTO> listTalks();
+    PageResult<TalkDTO> listTalks();
 
     /**
      * 根据id查看说说
