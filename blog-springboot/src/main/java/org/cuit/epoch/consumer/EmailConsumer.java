@@ -33,12 +33,18 @@ public class EmailConsumer {
     @RabbitHandler
     public void process(byte[] data) {
         EmailDTO emailDTO = JSON.parseObject(new String(data), EmailDTO.class);
+
+//        System.out.println("有个邮件已经开始发送 emailDTO = " + emailDTO);
+
         SimpleMailMessage message = new SimpleMailMessage();
         message.setFrom(email);
         message.setTo(emailDTO.getEmail());
         message.setSubject(emailDTO.getSubject());
         message.setText(emailDTO.getContent());
         javaMailSender.send(message);
+
+//        System.out.println("有个邮件已经发送成功 emailDTO = " + emailDTO);
+
     }
 
 }

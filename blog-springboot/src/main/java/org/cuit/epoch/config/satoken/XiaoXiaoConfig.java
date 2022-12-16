@@ -5,7 +5,6 @@ import cn.dev33.satoken.filter.SaServletFilter;
 import cn.dev33.satoken.interceptor.SaInterceptor;
 import cn.dev33.satoken.router.SaRouter;
 import cn.dev33.satoken.stp.StpUtil;
-import cn.dev33.satoken.util.SaResult;
 import com.alibaba.fastjson.JSON;
 import lombok.extern.slf4j.Slf4j;
 import org.cuit.epoch.exception.AppException;
@@ -78,18 +77,10 @@ public class XiaoXiaoConfig implements WebMvcConfigurer {
         registry.addInterceptor(new PageableHandlerInterceptor());
         //注册路由拦截器，自定义认证规则
         registry.addInterceptor(new SaInterceptor(handler -> {
-
             // 登录校验 -- 拦截所有路由，并排除/user/doLogin 用于开放登录
             SaRouter.match("/admin/**", "/login", r -> StpUtil.checkLogin());
-
-            // 角色校验 -- 拦截以 admin 开头的路由，必须具备 admin 角色或者 super-admin 角色才可以通过认证
-//            SaRouter.match("/admin/**", r -> StpUtil.checkRoleOr("admin", "test"));
             // 甚至你可以随意的写一个打印语句
             SaRouter.match("/**", r -> log.info("----啦啦啦跑了一个匿名接口了----路径为：" + request.getRequestURI()));
-
-//			// 连缀写法
-//			SaRouter.match("/**").check(r -> System.out.println("----啦啦啦----"));
-
         })).addPathPatterns("/**");
     }
 
@@ -114,8 +105,8 @@ public class XiaoXiaoConfig implements WebMvcConfigurer {
                     // 2022/11/18 这里就是用户权限不足的时候
                     // 2022/11/29 这里没有返回正确的值，result这里似乎不是json了 ：Result(flag=false, code=51000, message=未能读取到有效Token：用户未登录, data=null)
                     // 只需要加上一个JSON.toJSONString()就行了
-                    log.info(e.getMessage());
-                    e.printStackTrace();
+                    log.warn(e.getMessage());
+                    // e.printStackTrace();
                     if (e instanceof AppException) {
                         return JSON.toJSONString(Result.fail(e.getMessage()));
                     }
