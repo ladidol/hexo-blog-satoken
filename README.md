@@ -3883,6 +3883,10 @@ id
 
 
 
+
+
+
+
 ### 3）根据id查看说说
 
 #### 参数
@@ -4358,3 +4362,626 @@ messageService.removeByIds(messageIdList);
 
 
 
+
+
+## 评论模块
+
+会通过邮箱通知评论情况
+
+![image-20221216180427124](https://figurebed-ladidol.oss-cn-chengdu.aliyuncs.com/img/202212161804308.png)
+
+### 1）前台查询评论
+
+#### 参数
+
+current+评论类型type+主题topicId
+
+#### 简介
+
+前台通过主题id和评论类型查询当前页面的评论，同时有分页查询，默认size为10
+
+#### 实现细节
+
+1. 先查询评论量，如果为空就不进行下面的操作了
+
+   ```java
+   // 查询评论量
+   Integer commentCount = commentDao.selectCount(new LambdaQueryWrapper<Comment>()
+                                                 .eq(Objects.nonNull(commentQueryVO.getTopicId()), Comment::getTopicId, commentQueryVO.getTopicId())
+                                                 .eq(Comment::getType, commentQueryVO.getType())
+                                                 .isNull(Comment::getParentId)
+                                                 .eq(Comment::getIsReview, TRUE));
+   if (commentCount == 0) {
+       return new PageResult<>();
+   }
+   ```
+
+2. 对评论的封装，总思路就是先查询评论，然后再查询每一个评论对应的点赞数，绑定每一个父评论的子评论集，并查询回复量。
+
+   ①先查询属于这个topic下的父类和子类评论：
+
+   ```java
+   // 分页查询评论数据
+   List<CommentDTO> commentDTOList = commentDao.listComments(PageUtils.getLimitCurrent(), PageUtils.getSize(), commentQueryVO);
+   if (CollectionUtils.isEmpty(commentDTOList)) {
+       return new PageResult<>();
+   }
+   ```
+
+   mapper层
+
+   ```xml
+   <select id="listComments" resultType="org.cuit.epoch.dto.comment.CommentDTO">
+       SELECT
+       u.nickname,
+       u.avatar,
+       u.web_site,
+       c.user_id,
+       c.id,
+       c.comment_content,
+       c.create_time
+       FROM
+       tb_comment c
+       JOIN tb_user_info u ON c.user_id = u.id
+       <where>
+           <if test="commentVO.topicId != null">
+               topic_id = #{commentVO.topicId}
+           </if>
+           AND type = #{commentVO.type}
+           AND c.is_review = 1
+           AND parent_id IS NULL
+       </where>
+       ORDER BY
+       c.id DESC
+       LIMIT #{current},#{size}
+   </select>
+   ```
+
+   ②提取这些评论的id集合，查询评论回复
+
+   ```java
+   // 提取评论id集合
+   List<Integer> commentIdList = commentDTOList.stream()
+       .map(CommentDTO::getId)
+       .collect(Collectors.toList());
+   // 根据评论id集合查询回复数据
+   List<ReplyDTO> replyDTOList = commentDao.listReplies(commentIdList);
+   ```
+
+   mapper层
+
+   ```xml
+   <select id="listReplies" resultType="org.cuit.epoch.dto.comment.ReplyDTO">
+       SELECT
+       *
+       FROM
+       (
+       SELECT
+       c.user_id,
+       u.nickname,
+       u.avatar,
+       u.web_site,
+       c.reply_user_id,
+       r.nickname AS reply_nickname,
+       r.web_site AS reply_web_site,
+       c.id,
+       c.parent_id,
+       c.comment_content,
+       c.create_time,
+       row_number () over ( PARTITION BY parent_id ORDER BY create_time ASC ) row_num
+       FROM
+       tb_comment c
+       JOIN tb_user_info u ON c.user_id = u.id
+       JOIN tb_user_info r ON c.reply_user_id = r.id
+       WHERE
+       c.is_review = 1
+       AND
+       parent_id IN
+       (
+       <foreach collection="commentIdList" item="commentId" separator=",">
+           #{commentId}
+       </foreach>
+       )
+       ) t
+       WHERE
+       4 > row_num
+   </select>
+   ```
+
+   ③从redis中查询评论点赞数据，并封装回复点赞量
+
+   ```java
+   // 查询redis的评论点赞数据
+   Map<String, Object> likeCountMap = redisService.hGetAll(COMMENT_LIKE_COUNT);
+   // 封装回复点赞量
+   replyDTOList.forEach(item -> item.setLikeCount((Integer) likeCountMap.get(item.getId().toString())));
+   ```
+
+   ④根据评论分组它的回复
+
+   ```java
+   // 根据父评论id分组回复
+   Map<Integer, List<ReplyDTO>> replyMap = replyDTOList.stream()
+       .collect(Collectors.groupingBy(ReplyDTO::getParentId));
+   ```
+
+   ⑤查询每个父评论的回复量
+
+   ```java
+   .collect(Collectors.groupingBy(ReplyDTO::getParentId));
+   // 根据评论id查询回复量
+   Map<Integer, Integer> replyCountMap = commentDao.listReplyCountByCommentId(commentIdList)
+       .stream().collect(Collectors.toMap(ReplyCountDTO::getCommentId, ReplyCountDTO::getReplyCount));
+   ```
+
+   mapper层
+
+   ```xml
+   <select id="listReplyCountByCommentId" resultType="org.cuit.epoch.dto.comment.ReplyCountDTO">
+       SELECT
+       parent_id as comment_id,
+       count(1) AS reply_count
+       FROM
+       tb_comment
+       WHERE
+       is_review = 1
+       AND
+       parent_id IN
+       <foreach open="(" collection="commentIdList" item="commentId" separator="," close=")">
+           #{commentId}
+       </foreach>
+       GROUP BY
+       parent_id
+   </select>
+   ```
+
+3. 封装评论数据
+
+   ```java
+   // 封装评论数据
+   commentDTOList.forEach(item -> {
+       item.setLikeCount((Integer) likeCountMap.get(item.getId().toString()));
+       item.setReplyDTOList(replyMap.get(item.getId()));
+       item.setReplyCount(replyCountMap.get(item.getId()));
+   });
+   return new PageResult<>(commentDTOList, commentCount);
+   ```
+
+注意：
+
+这里的评论只有两级关系，父类和子类，通过回复这的id进行展示标记评论
+
+![image-20221215153456456](https://figurebed-ladidol.oss-cn-chengdu.aliyuncs.com/img/202212151534577.png)
+
+
+
+
+
+### 2）前台添加评论
+
+#### 参数
+
+```json
+{
+  "commentContent": {内容一定不为空},
+  "parentId": {看一下是不是存在父类，不存在的话就为null就行},
+  "replyUserId": {回复对象的名字},
+  "topicId": {模块id，可以是文章，也可以是页面},
+  "type": {评论类型 1.文章 2.友链 3.说说}
+}
+```
+
+#### 简介
+
+前端传来评论对象进行保存就行，当然还是需要判断一下是否需要审核，同时需要判断是否需要邮箱通知到被回复用户
+
+#### 实现细节
+
+1. 先判断是否需要审核
+
+   ```java
+   // 判断是否需要审核
+   WebsiteConfigVO websiteConfig = blogInfoService.getWebsiteConfig();
+   Integer isReview = websiteConfig.getIsCommentReview();
+   ```
+
+2. 过略标签并赋值到实体类中
+
+   ```java
+   // 过滤标签
+   commentVO.setCommentContent(HTMLUtils.filter(commentVO.getCommentContent()));
+   Comment comment = Comment.builder()
+       .userId(StpUtil.getLoginIdAsInt())
+       .replyUserId(commentVO.getReplyUserId())
+       .topicId(commentVO.getTopicId())
+       .commentContent(commentVO.getCommentContent())
+       .parentId(commentVO.getParentId())
+       .type(commentVO.getType())
+       .isReview(isReview == TRUE ? FALSE : TRUE)
+       .build();
+   commentDao.insert(comment);
+   ```
+
+3. 判断是否需要邮箱通知用户
+
+   ```java
+   // 判断是否开启邮箱通知,通知用户
+   if (websiteConfig.getIsEmailNotice().equals(TRUE)) {
+       CompletableFuture.runAsync(() -> notice(comment));
+   }
+   ```
+
+4. 这里的notice方法详情请见后面！
+
+   
+
+
+
+
+
+### 3）前台查询指定评论下的回复
+
+#### 参数
+
+current+size，路径参数{commentId}
+
+#### 简介
+
+这里是展示评论下全部回复的，用分页查询，是前端前台下面这个【点击查看】触发的。
+
+![image-20221215160705539](https://figurebed-ladidol.oss-cn-chengdu.aliyuncs.com/img/202212151607609.png)
+
+通过评论id，查询他所拥有的全部回复
+
+#### 实现细节
+
+1. 分页查询评论下的全部回复
+
+   ```java
+   // 转换页码查询评论下的回复
+   List<ReplyDTO> replyDTOList = commentDao.listRepliesByCommentId(PageUtils.getLimitCurrent(), PageUtils.getSize(), commentId);
+   ```
+
+   mapper层
+
+   ```java
+   <select id="listRepliesByCommentId" resultType="org.cuit.epoch.dto.comment.ReplyDTO">
+       SELECT
+           c.user_id,
+           u.nickname,
+           u.avatar,
+           u.web_site,
+           c.reply_user_id,
+           r.nickname as reply_nickname,
+           r.web_site as reply_web_site,
+           c.id,
+           c.parent_id,
+           c.comment_content,
+           c.create_time
+       FROM
+           tb_comment c
+               JOIN tb_user_info u ON c.user_id = u.id
+               JOIN tb_user_info r ON c.reply_user_id = r.id
+       WHERE
+           c.is_review = 1
+         AND
+           parent_id =#{commentId}
+       ORDER BY
+           c.id ASC
+           LIMIT #{current}, #{size}
+   </select>
+   ```
+
+2. 从redis中查询评论点赞数据，并封装到每一个评论dto中去
+
+   ```java
+   // 查询redis的评论点赞数据
+   Map<String, Object> likeCountMap = redisService.hGetAll(COMMENT_LIKE_COUNT);
+   // 封装点赞数据
+   replyDTOList.forEach(item -> item.setLikeCount((Integer) likeCountMap.get(item.getId().toString())));
+   ```
+
+
+
+
+
+### 4）前台评论点赞
+
+#### 参数
+
+commentId
+
+#### 简介
+
+通过当前登录用户的userInfoId和comment对评论的点赞情况
+
+#### 实现细节
+
+1. 拿到用户信息表 + 拼接成redis中点赞key
+
+   ```java
+   UserDetailDTO userDetailDTO = (UserDetailDTO) StpUtil.getSession().get(USER_INFO);
+   String commentLikeKey = COMMENT_USER_LIKE + userDetailDTO.getUserInfoId();
+   ```
+
+2. 判断是否点过赞，进行不同的操作（去赞or加赞）
+
+   ```java
+   // 判断是否点赞
+   if (redisService.sIsMember(commentLikeKey, commentId)) {
+       // 点过赞则删除评论id
+       redisService.sRemove(commentLikeKey, commentId);
+       // 评论点赞量-1
+       redisService.hDecr(COMMENT_LIKE_COUNT, commentId.toString(), 1L);
+   } else {
+       // 未点赞则增加评论id
+       redisService.sAdd(commentLikeKey, commentId);
+       // 评论点赞量+1
+       redisService.hIncr(COMMENT_LIKE_COUNT, commentId.toString(), 1L);
+   }
+   ```
+
+
+
+
+
+### 5）后台审核评论
+
+#### 参数
+
+```json
+{
+    "idList":"审核通过的评论的idlist",
+    "isDelete":"1审核通过,这里默认就通过了"
+}
+```
+
+#### 简介
+
+审核通过这些ids的评论，然后判断是否需要优先通知被回复的人
+
+#### 实现细节
+
+1. 进行审核操作
+
+   ```java
+   // 修改评论审核状态
+   List<Comment> commentList = reviewVO.getIdList().stream().map(item -> Comment.builder()
+                   .id(item)
+                   .isReview(reviewVO.getIsReview())
+                   .build())
+           .collect(Collectors.toList());
+   this.updateBatchById(commentList);
+   ```
+
+2. 进行群发通知
+
+   ```java
+   log.info("开始通知已经审核被回复的用户");
+   List<Integer> ids = commentList.stream().map(Comment::getId).collect(Collectors.toList());
+   List<Comment> comments = commentDao.listAllCommentsByIds(ids);
+   
+   WebsiteConfigVO websiteConfig = blogInfoService.getWebsiteConfig();
+   // 判断是否开启邮箱通知,通知这些用户
+   if (websiteConfig.getIsEmailNotice().equals(TRUE)) {
+       for (Comment comment : comments) {
+           // 2022/12/16 这里可以看一下，审核完后的评论再一次邮箱提醒收件人。 通过开不开线程能知道，runAsync这个方法可以阻止报错产生，以至于不会影响主线程
+           CompletableFuture.runAsync(() -> notice(comment));
+       }
+   }
+   ```
+
+   mapper层，查询这些comment的收件人id等信息
+
+   ```xml
+   <select id="listAllCommentsByIds" resultType="org.cuit.epoch.entity.Comment">
+       SELECT
+       c.user_id,
+       c.reply_user_id,
+       c.topic_id,
+       c.type,
+       c.id,
+       c.is_review,
+       c.create_time
+       FROM
+       tb_comment c
+       JOIN tb_user_info u ON c.user_id = u.id
+       WHERE
+       c.is_review = 1
+       AND
+       c.id IN
+       <foreach open="(" collection="commentIdList" item="commentId" separator="," close=")">
+           #{commentId}
+       </foreach>
+       ORDER BY
+       c.id ASC
+   </select>
+   ```
+
+   
+
+### 6）后台删除评论
+
+#### 参数
+
+commnetIdList
+
+#### 简介
+
+直接通过评论id集合进行物理删除
+
+#### 实现细节
+
+```java
+commentService.removeByIds(commentIdList);
+```
+
+
+
+### 7）后台查询评论
+
+#### 参数
+
+current+size，评论type+是否正在审核+关键字
+
+#### 简介
+
+后台那行评论分页查询+模糊查询，同时用动态sql语句进行条件查询
+
+#### 实现细节
+
+1. 先查询有多少个，进行特殊情况优化
+
+   ```java
+   // 统计后台评论量
+   Integer count = commentDao.countCommentDTO(condition);
+   if (count == 0) {
+       return new PageResult<>();
+   }
+   ```
+
+   mapper层
+
+   ```xml
+   <select id="countCommentDTO" resultType="java.lang.Integer">
+       SELECT
+       count(1)
+       from
+       tb_comment c
+       LEFT JOIN tb_user_info u ON c.user_id = u.id
+       <where>
+           <if test="condition.type != null">
+               c.type = #{condition.type}
+           </if>
+           <if test="condition.isReview != null">
+               and c.is_review = #{condition.isReview}
+           </if>
+           <if test="condition.keywords != null">
+               and u.nickname like concat('%',#{condition.keywords},'%')
+           </if>
+       </where>
+   </select>
+   ```
+
+2. 查询后台评论集合
+
+   ```java
+   // 查询后台评论集合
+   List<CommentBackDTO> commentBackDTOList = commentDao.listCommentBackDTO(PageUtils.getLimitCurrent(), PageUtils.getSize(), condition);
+   return new PageResult<>(commentBackDTOList, count);
+   ```
+
+   mapper层
+
+   ```xml
+   <select id="listCommentBackDTO" resultType="org.cuit.epoch.dto.comment.CommentBackDTO">
+       SELECT
+       c.id,
+       u.avatar,
+       u.nickname,
+       r.nickname AS reply_nickname,
+       a.article_title,
+       c.comment_content,
+       c.type,
+       c.create_time,
+       c.is_review
+       FROM
+       tb_comment c
+       LEFT JOIN tb_article a ON c.topic_id = a.id
+       LEFT JOIN tb_user_info u ON c.user_id = u.id
+       LEFT JOIN tb_user_info r ON c.reply_user_id = r.id
+       <where>
+           <if test="condition.type != null">
+               c.type = #{condition.type}
+           </if>
+           <if test="condition.isReview != null">
+               and c.is_review = #{condition.isReview}
+           </if>
+           <if test="condition.keywords != null">
+               and u.nickname like concat('%',#{condition.keywords},'%')
+           </if>
+       </where>
+       ORDER BY
+       id DESC
+       LIMIT #{current},#{size}
+   </select>
+   ```
+
+   
+
+
+
+### 8）notice方法（非接口）
+
+#### 参数
+
+```
+{
+  "replyUserId": {收件人},
+  "topicId": {可以是文章id},
+  "type": {评论所属类型}
+}
+```
+
+#### 简介
+
+根据收件人和评论基本信息进行邮箱发送，这个只是一个方法notice，方便其他接口方法使用
+
+#### 实现细节
+
+1. 查询被回复用户的邮箱号
+
+   ```java
+   // 查询回复用户邮箱号
+   Integer userId = BLOGGER_ID;
+   if (Objects.nonNull(comment.getReplyUserId())) {
+       userId = comment.getReplyUserId();
+   } else {
+       switch (Objects.requireNonNull(getCommentEnum(comment.getType()))) {
+           case ARTICLE:
+               userId = articleDao.selectById(comment.getTopicId()).getUserId();
+               break;
+           case TALK:
+               userId = talkDao.selectById(comment.getTopicId()).getUserId();
+               break;
+           default:
+               //如果都没有的话，就默认是站长
+               break;
+       }
+   }
+   ```
+
+2. 查询被回复用户的email
+
+   ```java
+   String email = userInfoDao.selectById(userId).getEmail();
+   ```
+
+3. 查看是否需要管理员审核一下
+
+   ```java
+   if (comment.getIsReview().equals(TRUE)) {
+       // 评论提醒
+       emailDTO.setEmail(email);
+       emailDTO.setSubject("评论提醒");
+       // 获取评论路径
+       String url = websiteUrl + getCommentPath(comment.getType()) + id;
+       emailDTO.setContent("您收到了一条新的回复，请前往" + url + "\n页面查看");
+   } else {
+       // 管理员审核提醒
+       String adminEmail = userInfoDao.selectById(BLOGGER_ID).getEmail();
+       emailDTO.setEmail(adminEmail);
+       emailDTO.setSubject("审核提醒");
+       emailDTO.setContent("您收到了一条新的回复，请前往后台管理页面审核");
+   }
+   ```
+
+debug：
+
+这里出现了报错，mq的错误，我超捏嘛，终于找到你娃子了
+
+![image-20221216020843059](https://figurebed-ladidol.oss-cn-chengdu.aliyuncs.com/img/202212160208320.png)
+
+最后发现是因为admin用户的邮箱绑定是admin@qq.com，以至于消费不起，啊啊啊啊啊原来如此。焯。
+
+出现了，为啥会查不到的情况了，因为有个bug用户996
