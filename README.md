@@ -1,4 +1,4 @@
-# hexo-blog-satoken
+# Hexo-Blog-SaToken
 重构博客
 
 这里先简单的介绍一下每一个接口的实现，后面通过swagger来md导出，再将这些加进去。
@@ -39,7 +39,7 @@ git push
 
 
 
-## 自定义架构模块
+## 自定义架构模块（todo
 
 ### 角色权限管理模块
 
@@ -474,7 +474,7 @@ public class MySourceSafilterAuthStrategy implements SaFilterAuthStrategy {
 
    
 
-### 自定义操作日记注解
+### 自定义操作日志注解
 
 #### 准备
 
@@ -743,7 +743,7 @@ public class MySourceSafilterAuthStrategy implements SaFilterAuthStrategy {
 
 
 
-### Redis设计
+### Redis设计（todo
 
 #### 1）在线用户
 
@@ -770,19 +770,31 @@ redisService.set(USER_ONLINE, onlineUsers);
 
 
 
-#### 用户地域分布情况
+#### 用户地域分布情况（todo
 
 
 
-#### 说说被点赞情况
+#### 说说被点赞情况（todo
 
 
 
-#### 文章浏览情况
+#### 文章浏览情况（todo
 
 
 
 
+
+### 策略模式（todo
+
+#### 1）上传策略（todo
+
+
+
+#### 1）搜索策略（todo
+
+
+
+#### 1）第三方登录策略（todo
 
 
 
@@ -1924,6 +1936,62 @@ userInfoId
    ```
 
 4. 页面信息，调用了**页面模块**中的listPages方法，和网站配置一样redis-mysql持久化访问机制。
+
+
+
+### 2）查看后台信息（等后面弄了文章模块再来弄一下）
+
+#### 参数
+
+无参数。
+
+#### 简介
+
+就是博客首页，但是这个博客首页后端直接返回给前端一些基本信息，比如博客网站的基本信息、是否展示某些页面、是否可用一些功能、博客全部页面的基本信息（首页，归档，分类，标签等等）。从而可以提高一些页面的访问速度。
+
+#### 实现细节
+
+1. 依旧是分开查询不同的表不同的信息，然后封装到同一个对象中
+
+
+
+
+
+
+
+
+
+
+
+### 3）上传博客配置图片
+
+#### 参数
+
+图片文件。
+
+#### 简介
+
+就是图床上传就行
+
+#### 实现细节
+
+1. 属于配置范畴的图片
+
+   ```java
+   uploadStrategyContext.executeUploadStrategy(file, FilePathEnum.CONFIG.getPath())
+   ```
+
+
+
+
+
+
+
+
+
+
+
+
 
 ## 后台菜单模块
 
@@ -5026,12 +5094,788 @@ current+size，评论type+是否正在审核+关键字
    }
    ```
 
-debug：
 
-这里出现了报错，mq的错误，我超捏嘛，终于找到你娃子了
 
-![image-20221216020843059](https://figurebed-ladidol.oss-cn-chengdu.aliyuncs.com/img/202212160208320.png)
+## 文章模块
 
-最后发现是因为admin用户的邮箱绑定是admin@qq.com，以至于消费不起，啊啊啊啊啊原来如此。焯。
 
-出现了，为啥会查不到的情况了，因为有个bug用户996
+
+
+
+### 1）查看文章归档
+
+#### 参数
+
+current+size
+
+#### 简介
+
+分页查询文章的title，根据时间展示。
+
+#### 实现细节
+
+1. 先通过mp的分页查询
+
+   ```java
+   Page<Article> page = new Page<>(PageUtils.getCurrent(), PageUtils.getSize());
+   // 获取分页数据
+   Page<Article> articlePage = articleDao.selectPage(page, new LambdaQueryWrapper<Article>()
+           .select(Article::getId, Article::getArticleTitle, Article::getCreateTime)
+           .orderByDesc(Article::getCreateTime)
+           .eq(Article::getIsDelete, FALSE)
+           .eq(Article::getStatus, PUBLIC.getStatus()));
+   ```
+
+2. 转换一下list类型就行了
+
+   ```java
+   List<ArchiveDTO> archiveDTOList = BeanCopyUtils.copyList(articlePage.getRecords(), ArchiveDTO.class);
+   return new PageResult<>(archiveDTOList, (int) articlePage.getTotal());
+   ```
+
+
+
+
+
+### 2）查看首页文章
+
+#### 参数
+
+current+size
+
+#### 简介
+
+直接分页查询就行，前端每查询一次就直接在后面加上，就没有分页展示了
+
+#### 实现细节
+
+1. 直接sql查询就行了，很多处理可以直接放到sql中去处理
+
+   ```java
+   return articleDao.listArticles(PageUtils.getLimitCurrent(), PageUtils.getSize());
+   ```
+
+   mapper层
+
+   ```java
+       <select id="listArticles" resultMap="articleHomeResultMap">
+           SELECT a.id,
+                  article_cover,
+                  article_title,
+                  SUBSTR(article_content, 1, 500) AS article_content,
+                  a.create_time,
+                  a.type,
+                  a.is_top,
+                  a.category_id,
+                  category_name,
+                  t.id                            AS tag_id,
+                  t.tag_name
+           FROM (SELECT id,
+                        article_cover,
+                        article_title,
+                        article_content,
+                        type,
+                        is_top,
+                        create_time,
+                        category_id
+                 FROM tb_article
+                 WHERE is_delete = 0
+                   AND status = 1
+                 ORDER BY is_top DESC,
+                          id DESC
+                     LIMIT #{current}, #{size}) a
+                    JOIN tb_category c ON a.category_id = c.id
+                    JOIN tb_article_tag atg ON a.id = atg.article_id
+                    JOIN tb_tag t ON t.id = atg.tag_id
+           ORDER BY a.is_top DESC,
+                    a.id DESC
+       </select>
+   ```
+
+   预览内容截取用了内置函数
+
+   ```sql
+   SUBSTR(article_content, 1, 500) AS article_content
+   ```
+
+   通过order by排序，进行置顶和时间排序
+
+   ```sql
+   ORDER BY a.is_top DESC,
+   a.id DESC
+   ```
+
+   
+
+### 3）查看后台文章
+
+#### 参数
+
+current+size，keywords+状态+categoryId+type+tagId
+
+#### 简介
+
+后台管理界面根据分类查询，模糊查询，集齐后台对文章列表查询的全部功能
+
+#### 实现细节
+
+1. 依旧是先查询文章总量
+
+   ```java
+   // 查询文章总量
+   Integer count = articleDao.countArticleBacks(condition);
+   if (count == 0) {
+       return new PageResult<>();
+   }
+   ```
+
+   mapper层
+
+   ```xml
+   <select id="countArticleBacks" resultType="java.lang.Integer">
+       SELECT
+       count(DISTINCT a.id)
+       from
+       tb_article a
+       LEFT JOIN tb_article_tag tat on  a.id = tat.article_id
+       <where>
+           is_delete = #{condition.isDelete}
+           <if test="condition.keywords != null">
+               and article_title like concat('%',#{condition.keywords},'%')
+           </if>
+           <if test="condition.status != null">
+               and `status` = #{condition.status}
+           </if>
+           <if test="condition.categoryId != null">
+               and category_id = #{condition.categoryId}
+           </if>
+           <if test="condition.type != null">
+               and type = #{condition.type}
+           </if>
+           <if test="condition.tagId != null">
+               and tat.tag_id = #{condition.tagId}
+           </if>
+       </where>
+   </select>
+   ```
+
+   动态sql的使用过于惊艳了！！！
+
+2. 查询后台文章
+
+   ```java
+   // 查询后台文章
+   List<ArticleBackDTO> articleBackDTOList = articleDao.listArticleBacks(PageUtils.getLimitCurrent(), PageUtils.getSize(), condition);
+   ```
+
+   mapper层
+
+   ```xml
+   <select id="listArticleBacks" resultMap="articleBackResultMap">
+       SELECT
+       a.id,
+       article_cover,
+       article_title,
+       type,
+       is_top,
+       a.is_delete,
+       a.status,
+       a.create_time,
+       category_name,
+       t.id AS tag_id,
+       t.tag_name
+       FROM
+       (
+       SELECT
+       id,
+       article_cover,
+       article_title,
+       type,
+       is_top,
+       is_delete,
+       status,
+       create_time,
+       category_id
+       FROM
+       tb_article
+       <where>
+           is_delete = #{condition.isDelete}
+           <if test="condition.keywords != null">
+               and article_title like concat('%',#{condition.keywords},'%')
+           </if>
+           <if test="condition.status != null">
+               and status = #{condition.status}
+           </if>
+           <if test="condition.categoryId != null">
+               and category_id = #{condition.categoryId}
+           </if>
+           <if test="condition.type != null">
+               and type = #{condition.type}
+           </if>
+           <if test="condition.tagId != null">
+               and id in
+                (
+                 SELECT
+                   article_id
+                 FROM
+                   tb_article_tag
+                 WHERE
+                   tag_id = #{condition.tagId}
+                )
+           </if>
+       </where>
+       ORDER BY
+         is_top DESC,
+         id DESC
+       LIMIT #{current},#{size}
+       ) a
+       LEFT JOIN tb_category c ON a.category_id = c.id
+       LEFT JOIN tb_article_tag atg ON a.id = atg.article_id
+       LEFT JOIN tb_tag t ON t.id = atg.tag_id
+       ORDER BY
+         is_top DESC,
+         a.id DESC
+   </select>
+   ```
+
+3. 查询文章点赞量和浏览量
+
+   ```java
+   // 查询文章点赞量和浏览量
+   Map<Object, Double> viewsCountMap = redisService.zAllScore(ARTICLE_VIEWS_COUNT);
+   Map<String, Object> likeCountMap = redisService.hGetAll(ARTICLE_LIKE_COUNT);
+   ```
+
+4. 封装点赞量和浏览量
+
+   ```java
+   // 封装点赞量和浏览量
+   articleBackDTOList.forEach(item -> {
+       Double viewsCount = viewsCountMap.get(item.getId());
+       if (Objects.nonNull(viewsCount)) {
+           item.setViewsCount(viewsCount.intValue());
+       }
+       item.setLikeCount((Integer) likeCountMap.get(item.getId().toString()));
+   });
+   return new PageResult<>(articleBackDTOList, count);
+   ```
+
+
+
+### 4）添加或修改文章
+
+#### 参数
+
+current+评论类型type+主题topicId
+
+#### 简介
+
+可以自动添加分类名，当然建立草稿的过程中是不需要添加分类的，这里的只是前端给你一个自定义选择。
+
+![image-20221218150225143](https://figurebed-ladidol.oss-cn-chengdu.aliyuncs.com/img/202212181502337.png)
+
+#### 实现细节
+
+1. 可以先拿到用户的信息和博客的配置信息
+
+   ```java
+   // 拿到用户信息
+   UserDetailDTO userDetailDTO = (UserDetailDTO) StpUtil.getSession().get(USER_INFO);
+   // 查询博客配置信息
+   CompletableFuture<WebsiteConfigVO> webConfig = CompletableFuture.supplyAsync(() -> blogInfoService.getWebsiteConfig());
+   ```
+
+2. 先判断一下需不要新建分类
+
+   ```java
+   // 保存文章的分类
+   Category category = saveArticleCategory(articleVO);
+   ```
+
+   saveArticleCategory方法（草稿就不需要保存了）
+
+   ```java
+   /**
+    * 保存文章分类
+    *
+    * @param articleVO 文章信息
+    * @return {@link Category} 文章分类
+    */
+   private Category saveArticleCategory(ArticleVO articleVO) {
+       // 判断分类是否存在
+       Category category = categoryDao.selectOne(
+               new LambdaQueryWrapper<Category>()
+                       .eq(Category::getCategoryName, articleVO.getCategoryName()));
+       if (Objects.isNull(category) && !articleVO.getStatus().equals(DRAFT.getStatus())) {
+           category = Category.builder().categoryName(articleVO.getCategoryName()).build();
+           categoryDao.insert(category);
+       }
+       return category;
+   }
+   ```
+
+3. 保存文章，补充填充一些字段
+
+   ```java
+   // 保存或修改文章
+   Article article = BeanCopyUtils.copyObject(articleVO, Article.class);
+   if (Objects.nonNull(category)) {
+       article.setCategoryId(category.getId());
+   }
+   // 设定默认文章封面
+   if (StrUtil.isBlank(article.getArticleCover())){
+       try {
+           article.setArticleCover(webConfig.get().getArticleCover());
+       } catch (Exception e) {
+           throw new AppException("设定默认文章封面失败");
+       }
+   }
+   article.setUserId(userDetailDTO.getUserInfoId());
+   this.saveOrUpdate(article);
+   ```
+
+4. 最后还需要保存一下文章的标签，找出新的tags进行save和绑定
+
+   ```java
+   // 保存文章标签
+   if (!articleVO.getStatus().equals(DRAFT.getStatus())) {
+       saveArticleTag(articleVO, article.getId());
+   }
+   ```
+
+   saveArticleTag方法详情请看下面
+
+5. saveArticleTag方法详解：
+
+   ①如果文章是编辑的话，就直接删除文章之前绑定的全部tags
+
+   ```java
+   // 编辑文章则删除文章所有标签
+   if (Objects.nonNull(articleVO.getId())) {
+       articleTagDao.delete(new LambdaQueryWrapper<ArticleTag>().eq(ArticleTag::getArticleId, articleVO.getId()));
+   }
+   ```
+
+   ②给文章添加tags绑定，新tags就新建（这里用到了list.reMoveAll来去重）
+
+   ```java
+   // 添加文章标签
+   List<String> tagNameList = articleVO.getTagNameList();
+   if (CollectionUtils.isNotEmpty(tagNameList)) {
+       // 查询已存在的标签
+       List<Tag> existTagList = tagService.list(new LambdaQueryWrapper<Tag>().in(Tag::getTagName, tagNameList));
+       List<String> existTagNameList = existTagList.stream().map(Tag::getTagName).collect(Collectors.toList());
+       List<Integer> existTagIdList = existTagList.stream().map(Tag::getId).collect(Collectors.toList());
+       // 对比新增不存在的标签
+       tagNameList.removeAll(existTagNameList);
+       if (CollectionUtils.isNotEmpty(tagNameList)) {
+           List<Tag> tagList = tagNameList.stream().map(item -> Tag.builder().tagName(item).build()).collect(Collectors.toList());
+           tagService.saveBatch(tagList);
+           List<Integer> tagIdList = tagList.stream().map(Tag::getId).collect(Collectors.toList());
+           existTagIdList.addAll(tagIdList);
+       }
+       // 提取标签id绑定文章
+       List<ArticleTag> articleTagList = existTagIdList.stream().map(item -> ArticleTag.builder()
+                       .articleId(articleId)
+                       .tagId(item)
+                       .build())
+               .collect(Collectors.toList());
+       articleTagService.saveBatch(articleTagList);
+   }
+   ```
+
+### 5）修改文章置顶
+
+#### 参数
+
+articleId+IsTop
+
+#### 简介
+
+前台通过主题id和评论类型查询当前页面的评论，同时有分页查询，默认size为10
+
+#### 实现细节
+
+1. ```java
+   // 修改文章置顶状态
+   Article article = Article.builder().id(articleTopVO.getId()).isTop(articleTopVO.getIsTop()).build();
+   articleDao.updateById(article);
+   ```
+
+
+
+
+
+
+
+### 6）恢复或删除文章
+
+#### 参数
+
+idList+isDelete
+
+#### 简介
+
+逻辑删除和恢复，可批量操作
+
+#### 实现细节
+
+
+
+1. ```java
+   // 修改文章逻辑删除状态
+   List<Article> articleList = deleteVO.getIdList().stream().map(id -> Article.builder()
+                   .id(id)
+                   .isTop(FALSE)
+                   .isDelete(deleteVO.getIsDelete())
+                   .build())
+           .collect(Collectors.toList());
+   this.updateBatchById(articleList);
+   ```
+
+### 7）上传文章图片
+
+#### 参数
+
+文件图片
+
+#### 简介
+
+这个模块的图床上传接口
+
+#### 实现细节
+
+1. ```java
+   uploadStrategyContext.executeUploadStrategy(file, FilePathEnum.ARTICLE.getPath())
+   ```
+
+
+
+
+
+### 8）物理删除文章
+
+#### 参数
+
+articleIdList
+
+#### 简介
+
+从回收站中删除文章
+
+#### 实现细节
+
+1. 先删除文章标签关联，然后就批量删除文章
+
+   ```java
+   // 删除文章标签关联
+   articleTagDao.delete(new LambdaQueryWrapper<ArticleTag>().in(ArticleTag::getArticleId, articleIdList));
+   // 删除文章
+   articleDao.deleteBatchIds(articleIdList);
+   ```
+
+
+
+### 9）根据id查看后台文章
+
+#### 参数
+
+articleId
+
+#### 简介
+
+后台通过articleid查询文章详细信息
+
+#### 实现细节
+
+1. 查询文章信息+查询文章分类信息+查询文章标签信息
+
+   ```java
+   // 查询文章信息
+   Article article = articleDao.selectById(articleId);
+   // 查询文章分类
+   Category category = categoryDao.selectById(article.getCategoryId());
+   String categoryName = null;
+   if (Objects.nonNull(category)) {
+       categoryName = category.getCategoryName();
+   }
+   // 查询文章标签
+   List<String> tagNameList = tagDao.listTagNameByArticleId(articleId);
+   ```
+
+   mapper，根据articleId查询文章对应的标签
+
+   ```xml
+   <select id="listTagNameByArticleId" resultType="java.lang.String">
+       SELECT
+         tag_name
+       FROM
+         tb_tag t
+         JOIN tb_article_tag tat ON t.id = tat.tag_id
+       WHERE
+           article_id = #{articleId}
+   </select>
+   ```
+
+2. 封装数据
+
+   ```java
+   // 封装数据
+   ArticleVO articleVO = BeanCopyUtils.copyObject(article, ArticleVO.class);
+   articleVO.setCategoryName(categoryName);
+   articleVO.setTagNameList(tagNameList);
+   return articleVO;
+   ```
+
+
+
+
+
+### 10）根据id查看前台文章
+
+#### 参数
+
+articleId
+
+#### 简介
+
+前台，通过用户点击访问这篇文章，值得注意的是：第一次访问的话会增加这个评论的访问量
+
+这个接口需要完成的东西挺多的，需要返回推荐文章、最新文章、上下篇文章
+
+![image-20221218172910206](https://figurebed-ladidol.oss-cn-chengdu.aliyuncs.com/img/202212181729536.png)
+
+#### 实现细节
+
+1. 先查询推荐文章和最新文章
+
+   ```java
+   // 查询推荐文章
+   CompletableFuture<List<ArticleRecommendDTO>> recommendArticleList = CompletableFuture.supplyAsync(() -> articleDao.listRecommendArticles(articleId));
+   // 查询最新文章
+   CompletableFuture<List<ArticleRecommendDTO>> newestArticleList = CompletableFuture.supplyAsync(() -> {
+       List<Article> articleList = articleDao.selectList(new LambdaQueryWrapper<Article>()
+               .select(Article::getId, Article::getArticleTitle, Article::getArticleCover, Article::getCreateTime).eq(Article::getIsDelete, FALSE)
+               .eq(Article::getStatus, PUBLIC.getStatus()).orderByDesc(Article::getId).last("limit 5"));
+       return BeanCopyUtils.copyList(articleList, ArticleRecommendDTO.class);
+   });
+   ```
+
+2. 查看是否存在这个文章
+
+   ```java
+   // 查询id对应文章
+   ArticleDTO article = articleDao.getArticleById(articleId);
+   if (Objects.isNull(article)) {
+       throw new AppException("文章不存在");
+   }
+   ```
+
+3. 更新文章浏览量
+
+   ```java
+   // 更新文章浏览量
+   updateArticleViewsCount(articleId);
+   ```
+
+   方法实现:
+
+   ```java
+   // 判断是否第一次访问，增加浏览量
+   Set<Integer> articleSet = CommonUtils.castSet(Optional.ofNullable(session.getAttribute(ARTICLE_SET)).orElseGet(HashSet::new), Integer.class);
+   if (!articleSet.contains(articleId)) {
+       articleSet.add(articleId);
+       session.setAttribute(ARTICLE_SET, articleSet);
+       // 浏览量+1
+       log.info("有一个新用户访问文章！");
+       redisService.zIncr(ARTICLE_VIEWS_COUNT, articleId, 1D);
+   }
+   ```
+
+4. 查询并封装上下篇文章
+
+   ```java
+   // 查询上一篇下一篇文章
+   Article lastArticle = articleDao.selectOne(new LambdaQueryWrapper<Article>()
+           .select(Article::getId, Article::getArticleTitle, Article::getArticleCover).eq(Article::getIsDelete, FALSE)
+           .eq(Article::getStatus, PUBLIC.getStatus())
+           .lt(Article::getId, articleId)
+           .orderByDesc(Article::getId).last("limit 1"));
+   Article nextArticle = articleDao.selectOne(new LambdaQueryWrapper<Article>()
+           .select(Article::getId, Article::getArticleTitle, Article::getArticleCover).eq(Article::getIsDelete, FALSE)
+           .eq(Article::getStatus, PUBLIC.getStatus())
+           .gt(Article::getId, articleId).orderByAsc(Article::getId)
+           .last("limit 1"));
+   article.setLastArticle(BeanCopyUtils.copyObject(lastArticle, ArticlePaginationDTO.class));
+   article.setNextArticle(BeanCopyUtils.copyObject(nextArticle, ArticlePaginationDTO.class));
+   ```
+
+5. 封装点赞量和浏览量
+
+   ```java
+   // 封装点赞量和浏览量
+   Double score = redisService.zScore(ARTICLE_VIEWS_COUNT, articleId);
+   if (Objects.nonNull(score)) {
+       article.setViewsCount(score.intValue());
+   }
+   article.setLikeCount((Integer) redisService.hGet(ARTICLE_LIKE_COUNT, articleId.toString()));
+   ```
+
+6. 封装推荐文章和最近文章（这两个查库操作是通过异步来执行的）
+
+   ```java
+   // 封装文章信息
+   try {
+       article.setRecommendArticleList(recommendArticleList.get());
+       article.setNewestArticleList(newestArticleList.get());
+   } catch (Exception e) {
+       log.error(StrUtil.format("堆栈信息:{}", ExceptionUtil.stacktraceToString(e)));
+   }
+   return article;
+   ```
+
+亮点：
+
+这里面用到了`CompletableFuture<String> recommendArticleList = CompletableFuture.supplyAsync(() ->`来进行异步查询，后面通过`recommendArticleList.get()`来获取异步查询结果，这里可以节约点时间。
+
+
+
+
+
+### 11）根据条件查询文章(todo 这个接口是来干啥用的)
+
+#### 参数
+
+
+
+#### 简介
+
+前台通过主题id和评论类型查询当前页面的评论，同时有分页查询，默认size为10
+
+#### 实现细节
+
+1. 先查询评论量，如果为空就不进行下面的操作了
+
+
+
+
+
+
+
+### 12）点赞文章
+
+#### 参数
+
+articleId
+
+#### 简介
+
+将用户的文章点赞情况存入redis中去，同时更新redis中文章的总点赞量
+
+#### 实现细节
+
+1. 更新redis
+
+   ```java
+   // 拿到用户信息表 + 拼接成redis中文章点赞key
+   UserDetailDTO userDetailDTO = (UserDetailDTO) StpUtil.getSession().get(USER_INFO);
+   String articleLikeKey = ARTICLE_USER_LIKE + userDetailDTO.getUserInfoId();
+   if (redisService.sIsMember(articleLikeKey, articleId)) {
+       // 点过赞则删除文章id
+       redisService.sRemove(articleLikeKey, articleId);
+       // 文章点赞量-1
+       redisService.hDecr(ARTICLE_LIKE_COUNT, articleId.toString(), 1L);
+   } else {
+       // 未点赞则增加文章id
+       redisService.sAdd(articleLikeKey, articleId);
+       // 文章点赞量+1
+       redisService.hIncr(ARTICLE_LIKE_COUNT, articleId.toString(), 1L);
+   }
+   ```
+
+
+
+
+
+### 13）导出文章
+
+#### 参数
+
+articleIdList
+
+#### 简介
+
+统一的文件模块，上传文件得到url返回给前端就行。
+
+#### 实现细节
+
+1. 查询全部文件的title和content
+
+   ```java
+   // 查询文章信息
+   List<Article> articleList = articleDao.selectList(new LambdaQueryWrapper<Article>()
+           .select(Article::getArticleTitle, Article::getArticleContent)
+           .in(Article::getId, articleIdList));
+   ```
+
+2. 将文章内容以字符流的形式传给oss中，文件类型其实就是一个文件名，从而得到文件url
+
+   ```java
+   // 写入文件并上传
+   List<String> urlList = new ArrayList<>();
+   for (Article article : articleList) {
+       try (ByteArrayInputStream inputStream = new ByteArrayInputStream(article.getArticleContent().getBytes())) {
+           String url = uploadStrategyContext.executeUploadStrategy(article.getArticleTitle() + FileExtEnum.MD.getExtName(), inputStream, FilePathEnum.MD.getPath());
+           urlList.add(url);
+       } catch (Exception e) {
+           log.error(StrUtil.format("导入文章失败,堆栈:{}", ExceptionUtil.stacktraceToString(e)));
+           throw new AppException("导出文章失败");
+       }
+   }
+   return urlList;
+   ```
+
+
+
+
+
+
+
+### 14）导入文章todo
+
+#### 参数
+
+current+评论类型type+主题topicId
+
+#### 简介
+
+前台通过主题id和评论类型查询当前页面的评论，同时有分页查询，默认size为10
+
+#### 实现细节
+
+1. 先查询评论量，如果为空就不进行下面的操作了
+
+
+
+### 15）搜索文章todo
+
+#### 参数
+
+current+评论类型type+主题topicId
+
+#### 简介
+
+前台通过主题id和评论类型查询当前页面的评论，同时有分页查询，默认size为10
+
+#### 实现细节
+
+1. 先查询评论量，如果为空就不进行下面的操作了
+
+
+
+
+
+
+
+
+
