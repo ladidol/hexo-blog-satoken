@@ -5841,11 +5841,11 @@ articleIdList
 
 
 
-### 14）导入文章todo
+### 14）导入文章 todo
 
 #### 参数
 
-current+评论类型type+主题topicId
+
 
 #### 简介
 
@@ -5857,11 +5857,11 @@ current+评论类型type+主题topicId
 
 
 
-### 15）搜索文章todo
+### 15）搜索文章 todo
 
 #### 参数
 
-current+评论类型type+主题topicId
+
 
 #### 简介
 
