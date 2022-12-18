@@ -148,3 +148,9 @@ weibo:
 logging:
   level:
     root: info
+
+
+# 网站前台域名（邮件通知用）
+website:
+  url: http://localhost
+#  url: http://blog.ladidol.top
