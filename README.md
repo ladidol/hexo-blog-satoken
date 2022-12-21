@@ -790,31 +790,198 @@ redisService.set(USER_ONLINE, onlineUsers);
 
 
 
-#### 1）搜索策略（todo
+#### 2）搜索策略（todo
 
 
 
-#### 1）第三方登录策略（todo
+#### 3）第三方登录策略（todo
 
 
 
+#### 4）文章导入策略
 
+##### 文章导入策略上下文：
 
+```java
+/**
+ * @author: Xiaoqiang-Ladidol
+ * @date: 2022/12/21 18:35
+ * @description: {文章导入策略上下文}
+ */
+@Service
+public class ArticleImportStrategyContext {
+    @Autowired
+    private Map<String, ArticleImportStrategy> articleImportStrategyMap;
 
+    public void importArticles(MultipartFile file, String type) {
+        articleImportStrategyMap.get(MarkdownTypeEnum.getMarkdownType(type)).importArticles(file);
+    }
+}
 
+```
 
+##### 文章导入策略：
 
+```java
+/**
+ * @author: Xiaoqiang-Ladidol
+ * @date: 2022/12/21 18:37
+ * @description: {文章导入策略}
+ */
+public interface ArticleImportStrategy {
 
+    /**
+     * 导入文章
+     *
+     * @param file 文件
+     */
+    void importArticles(MultipartFile file);
+}
+```
 
+##### 文章导入策略实现：
 
+①hexo文章导入：
 
+> 通过对hexo文件开头的---分割进行定位获取文章参数，从而封装article文章对象，存入数据库
 
+```java
+/**
+ * @author: Xiaoqiang-Ladidol
+ * @date: 2022/12/21 18:38
+ * @description: {}
+ */
+@Slf4j
+@Service("hexoArticleImportStrategyImpl")
+public class HexoArticleImportStrategyImpl implements ArticleImportStrategy {
+    @Autowired
+    private ArticleService articleService;
 
+    /**
+     * hexo最大分隔符数
+     */
+    private final int HEXO_MAX_DELIMITER_COUNT = 2;
 
+    /**
+     * hexo最小分隔符数
+     */
+    private final int HEXO_MIN_DELIMITER_COUNT = 1;
 
+    private final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
+    @Override
+    public void importArticles(MultipartFile file) {
+        try {
+            HexoArticleVO hexoArticleVO = new HexoArticleVO();
+            // 原创
+            hexoArticleVO.setType(ORIGINAL.getType());
+            // 公开 （DRAFT不保存分类）
+            hexoArticleVO.setStatus(PUBLIC.getStatus());
 
+            AtomicInteger hexoDelimiterCount = new AtomicInteger();
+            StringBuilder articleContent = new StringBuilder();
 
+            // 分类或标签标记
+            AtomicInteger flag = new AtomicInteger(NORMAL_FLAG);
+
+            List<String> tagList = new ArrayList<>();
+
+            BufferedReader reader = new BufferedReader(new InputStreamReader(file.getInputStream(), StandardCharsets.UTF_8));
+            reader.lines().forEach(line -> {
+                if (hexoDelimiterCount.get() == HEXO_MAX_DELIMITER_COUNT) {
+                    // 分隔符结束就是正文
+                    articleContent.append(line).append(NEW_LINE);
+                } else {
+                    if (line.equals(DELIMITER)) {//到达一个“---”分隔符就开始自加
+                        hexoDelimiterCount.getAndIncrement();
+                    }
+                    if (hexoDelimiterCount.get() == HEXO_MIN_DELIMITER_COUNT) {
+                        if (line.startsWith(TITLE_PREFIX)) {
+                            hexoArticleVO.setArticleTitle(line.replace(TITLE_PREFIX, "").trim());
+                        } else if (line.startsWith(DATE_PREFIX)) {
+                            hexoArticleVO.setCreateTime(LocalDateTime.parse(line.replace(DATE_PREFIX, "").trim(), formatter));
+                        } else if (line.startsWith(CATEGORIES_PREFIX)) {
+                            flag.set(CATEGORY_FLAG);
+                        } else if (line.startsWith(TAGS_PREFIX)) {
+                            flag.set(TAG_FLAG);
+                        } else if (line.startsWith(PREFIX) && flag.intValue() == CATEGORY_FLAG) {
+                            hexoArticleVO.setCategoryName(line.replace(PREFIX, "").trim());
+                        } else if (line.startsWith(PREFIX) && flag.intValue() == TAG_FLAG) {
+                            tagList.add(line.replace(PREFIX, "").trim());
+                        }
+                    }
+                }
+            });
+
+            hexoArticleVO.setTagNameList(tagList);
+            hexoArticleVO.setArticleContent(articleContent.toString());
+
+            // 如果分类或标签为空则设为草稿
+            if (CollectionUtils.isEmpty(hexoArticleVO.getTagNameList()) || StrUtil.isBlank(hexoArticleVO.getCategoryName())) {
+                hexoArticleVO.setStatus(DRAFT.getStatus());
+            }
+
+            articleService.saveOrUpdateArticle(hexoArticleVO);
+        } catch (IOException e) {
+            log.error(StrUtil.format("导入Hexo文章失败, 堆栈:{}", ExceptionUtil.stacktraceToString(e)));
+            throw new AppException("导入Hexo文章失败");
+        }
+    }
+
+}
+```
+
+②普通文章导入：
+
+> 通过文件的基本属性进行article对象封装
+
+```java
+/**
+ * @author: Xiaoqiang-Ladidol
+ * @date: 2022/12/21 18:46
+ * @description: {}
+ */
+@Slf4j
+@Service("normalArticleImportStrategyImpl")
+public class NormalArticleImportStrategyImpl implements ArticleImportStrategy {
+    @Autowired
+    private ArticleService articleService;
+
+    @Override
+    public void importArticles(MultipartFile file) {
+        // 获取文件名作为文章标题
+        String filename = file.getOriginalFilename();
+        log.info("导入文件初始名：" + filename);
+        if (StringUtils.isBlank(filename)) {
+            throw new AppException("文件名不能为空");
+        }
+        String[] arr = filename.split("\\.");
+        String articleTitle;
+        if (arr.length > 1) {
+            articleTitle = arr[arr.length - 2];
+        } else {
+            articleTitle = arr[arr.length - 1];
+        }
+        // 获取文章内容
+        StringBuilder articleContent = new StringBuilder();
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(file.getInputStream()))) {
+            while (reader.ready()) {
+                articleContent.append((char) reader.read());
+            }
+        } catch (IOException e) {
+            log.error(StrUtil.format("导入文章失败, 堆栈:{}", ExceptionUtil.stacktraceToString(e)));
+            throw new AppException("导入文章失败");
+        }
+        // 保存文章
+        ArticleVO articleVO = ArticleVO.builder()
+                .articleTitle(articleTitle)
+                .articleContent(articleContent.toString())
+                .status(DRAFT.getStatus())
+                .build();
+        articleService.saveOrUpdateArticle(articleVO);
+    }
+}
+```
 
 
 
@@ -5841,23 +6008,28 @@ articleIdList
 
 
 
-### 14）导入文章 todo
+### 14）导入文章 
 
 #### 参数
 
-
+文章文件+文章类型（"hexo"或者""）
 
 #### 简介
 
-前台通过主题id和评论类型查询当前页面的评论，同时有分页查询，默认size为10
+前台通过从自己系统中选择文章文件上传给后端
 
 #### 实现细节
 
-1. 先查询评论量，如果为空就不进行下面的操作了
+直接使用上传策略
+
+```java
+articleImportStrategyContext.importArticles(file, type);
+return Result.ok();
+```
 
 
 
-### 15）搜索文章 todo
+### 15）搜索文章 (todo)
 
 #### 参数
 
