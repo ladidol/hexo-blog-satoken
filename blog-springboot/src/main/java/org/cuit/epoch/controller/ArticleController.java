@@ -5,9 +5,9 @@ import io.swagger.annotations.ApiImplicitParam;
 import io.swagger.annotations.ApiOperation;
 import org.cuit.epoch.annotation.OptLog;
 import org.cuit.epoch.dto.article.*;
-import org.cuit.epoch.dto.article.ArticleHomeDTO;
 import org.cuit.epoch.enums.FilePathEnum;
 import org.cuit.epoch.service.ArticleService;
+import org.cuit.epoch.strategy.context.ArticleImportStrategyContext;
 import org.cuit.epoch.strategy.context.UploadStrategyContext;
 import org.cuit.epoch.util.Result;
 import org.cuit.epoch.vo.ArticleTopVO;
@@ -36,8 +36,8 @@ public class ArticleController {
     private ArticleService articleService;
     @Autowired
     private UploadStrategyContext uploadStrategyContext;
-//    @Autowired
-//    private ArticleImportStrategyContext articleImportStrategyContext;
+    @Autowired
+    private ArticleImportStrategyContext articleImportStrategyContext;
 
     /**
      * 查看文章归档
@@ -221,9 +221,6 @@ public class ArticleController {
         return Result.ok(articleService.exportArticles(articleIdList));
     }
 
-
-    // TODO: 2022/12/17 导入文章！
-
     /**
      * 导入文章
      *
@@ -231,10 +228,10 @@ public class ArticleController {
      * @param type 文章类型
      * @return {@link Result<>}
      */
-//    @ApiOperation(value = "导入文章")
-//    @PostMapping("/admin/articles/import")
-//    public Result<?> importArticles(MultipartFile file, @RequestParam(required = false) String type) {
-//        articleImportStrategyContext.importArticles(file, type);
-//        return Result.ok();
-//    }
+    @ApiOperation(value = "导入文章")
+    @PostMapping("/admin/articles/import")
+    public Result<?> importArticles(MultipartFile file, @RequestParam(required = false) String type) {
+        articleImportStrategyContext.importArticles(file, type);
+        return Result.ok();
+    }
 }
