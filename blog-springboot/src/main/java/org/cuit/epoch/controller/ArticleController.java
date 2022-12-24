@@ -182,17 +182,17 @@ public class ArticleController {
 
     // TODO: 2022/12/17 es或者mysql搜索
 
-//    /**
-//     * 搜索文章
-//     *
-//     * @param condition 条件
-//     * @return {@link Result<ArticleSearchDTO>} 文章列表
-//     */
-//    @ApiOperation(value = "搜索文章")
-//    @GetMapping("/articles/search")
-//    public Result<List<ArticleSearchDTO>> listArticlesBySearch(ConditionVO condition) {
-//        return Result.ok(articleService.listArticlesBySearch(condition));
-//    }
+    /**
+     * 搜索文章
+     *
+     * @param condition 条件
+     * @return {@link Result<ArticleSearchDTO>} 文章列表
+     */
+    @ApiOperation(value = "搜索文章")
+    @GetMapping("/articles/search")
+    public Result<List<ArticleSearchDTO>> listArticlesBySearch(ConditionVO condition) {
+        return Result.ok(articleService.listArticlesBySearch(condition));
+    }
 
     /**
      * 点赞文章

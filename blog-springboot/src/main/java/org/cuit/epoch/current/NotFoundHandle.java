@@ -1,6 +1,5 @@
 package org.cuit.epoch.current;
 
-import cn.dev33.satoken.util.SaResult;
 import org.cuit.epoch.util.Result;
 import org.springframework.boot.web.servlet.error.ErrorController;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -25,4 +24,8 @@ public class NotFoundHandle implements ErrorController {
         return Result.fail(404,"not found");
     }
 
+    @Override
+    public String getErrorPath() {
+        return null;
+    }
 }

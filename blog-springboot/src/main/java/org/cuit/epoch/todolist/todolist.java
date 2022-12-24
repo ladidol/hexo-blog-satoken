@@ -1,10 +1,5 @@
 package org.cuit.epoch.todolist;
 
-import org.cuit.epoch.strategy.UploadStrategy;
-import org.springframework.beans.factory.annotation.Autowired;
-
-import java.util.Map;
-
 /**
  * @author: ladidol
  * @date: 2022/11/16 0:03
@@ -27,8 +22,8 @@ public class todolist {
     //用户信息
     // 2022/11/20  就是UserUtils工具类直接获取当前登录者的全部信息。顺便看一下哪些地方有没有重复。
     // 2022/11/21 又出现了一些问题：就是userInfoId和userAuthId是不一样的，比如updateUserInfo里面传的参数应该是infoid。解决通过存入redis中共的用户信息获取infoId
-    @Autowired
-    private Map<String, UploadStrategy> uploadStrategyMap;
+//    @Autowired
+//    private Map<String, UploadStrategy> uploadStrategyMap;
     // 在spring中，根据spring的特性，Spring 会在启动时，自动查找实现了该接口的 bean，放到这个Map中去。key为bean的名字，value为 实现了该接口的所有的 bean。通过这种方式，就可以不用再通过构造方法将实现的策略类传入
     //2022/11/21 这里感觉好帅啊 ，这个策略模式，UploadStrategy实现类通过@Service("localUploadStrategyImpl")，就能直接用Map来获取。
     //用户redis信息添加
@@ -72,9 +67,6 @@ public class todolist {
     //=====================================================待学的部分知识点============================================================================
     // TODO: 2022/11/25 无聊可以把Stream流部分好好补一下，比如下面对菜单进行分类传给前端就很帅！！！！
     // TODO: 2022/11/25 需要将博客换成https，有空的话 
-    
-    
-
 
 
 

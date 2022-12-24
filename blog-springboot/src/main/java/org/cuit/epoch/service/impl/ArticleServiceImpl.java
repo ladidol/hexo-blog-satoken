@@ -22,6 +22,7 @@ import org.cuit.epoch.mapper.ArticleTagMapper;
 import org.cuit.epoch.mapper.CategoryMapper;
 import org.cuit.epoch.mapper.TagMapper;
 import org.cuit.epoch.service.*;
+import org.cuit.epoch.strategy.context.SearchStrategyContext;
 import org.cuit.epoch.strategy.context.UploadStrategyContext;
 import org.cuit.epoch.util.BeanCopyUtils;
 import org.cuit.epoch.util.CommonUtils;
@@ -62,8 +63,8 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, Article> impl
     private TagService tagService;
     @Autowired
     private ArticleTagMapper articleTagDao;
-    //    @Autowired
-//    private SearchStrategyContext searchStrategyContext;
+    @Autowired
+    private SearchStrategyContext searchStrategyContext;
     @Autowired
     private HttpSession session;//用来存用户访问是否第一次该文章
 //    private SaSession session;
@@ -299,11 +300,10 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, Article> impl
     }
 
 
-    // TODO: 2022/12/17 es搜索或者用mysql
-//    @Override
-//    public List<ArticleSearchDTO> listArticlesBySearch(ConditionVO condition) {
-//        return searchStrategyContext.executeSearchStrategy(condition.getKeywords());
-//    }
+    @Override
+    public List<ArticleSearchDTO> listArticlesBySearch(ConditionVO condition) {
+        return searchStrategyContext.executeSearchStrategy(condition.getKeywords());
+    }
 
 
     @Override

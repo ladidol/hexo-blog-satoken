@@ -18,6 +18,19 @@ class HexoBlogSatokenApplicationTests {
     CommentMapper commentMapper;
 
 
+
+//    @Autowired
+//    private ArticleSearchRepository elasticsearchDao;
+//
+//
+//    @Test
+//    void test122(){
+//        // 获取文章数据
+//        Article article = Article.builder().articleTitle("test1中的es数据插入1").articleContent("nihaonihao你好这里是小小的博客").build();
+//        elasticsearchDao.save(BeanCopyUtils.copyObject(article, ArticleSearchDTO.class));
+//
+//    }
+
     @Test
     void contextLoads() {
     }
