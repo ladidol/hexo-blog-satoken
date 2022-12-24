@@ -790,7 +790,295 @@ redisService.set(USER_ONLINE, onlineUsers);
 
 
 
-#### 2）搜索策略（todo
+#### 2）搜索策略
+
+##### 搜索策略上下文：
+
+```java
+/**
+ * @author: Xiaoqiang-Ladidol
+ * @date: 2022/12/21 22:00
+ * @description: {搜索策略上下文}
+ */
+@Service
+public class SearchStrategyContext {
+    /**
+     * 搜索模式
+     */
+    @Value("${search.mode}")
+    private String searchMode;
+
+    @Autowired
+    private Map<String, SearchStrategy> searchStrategyMap;
+
+    /**
+     * 执行搜索策略
+     *
+     * @param keywords 关键字
+     * @return {@link List < ArticleSearchDTO >} 搜索文章
+     */
+    public List<ArticleSearchDTO> executeSearchStrategy(String keywords) {
+        SearchStrategy searchStrategy = searchStrategyMap.get(getStrategy(searchMode));
+        return searchStrategy.searchArticle(keywords);
+    }
+
+}
+```
+
+##### 搜索策略：
+
+```java
+/**
+ * @author: Xiaoqiang-Ladidol
+ * @date: 2022/12/21 22:07
+ * @description: {搜索策略}
+ */
+public interface SearchStrategy {
+
+    /**
+     * 搜索文章
+     *
+     * @param keywords 关键字
+     * @return {@link List <ArticleSearchDTO>} 文章列表
+     */
+    List<ArticleSearchDTO> searchArticle(String keywords);
+
+}
+```
+
+##### mysql搜索策略：
+
+直接数据库搜索就行，比较熟悉，同时进行结果高亮处理
+
+```java
+@Service("mySqlSearchStrategyImpl")
+public class MySqlSearchStrategyImpl implements SearchStrategy {
+    @Autowired
+    private ArticleMapper articleDao;
+
+    @Override
+    public List<ArticleSearchDTO> searchArticle(String keywords) {
+        // 判空
+        if (StringUtils.isBlank(keywords)) {
+            return new ArrayList<>();
+        }
+        // 搜索文章
+        List<Article> articleList = articleDao.selectList(new LambdaQueryWrapper<Article>()
+                .eq(Article::getIsDelete, FALSE)
+                .eq(Article::getStatus, PUBLIC.getStatus())
+                .and(i -> i.like(Article::getArticleTitle, keywords)
+                        .or()
+                        .like(Article::getArticleContent, keywords)));
+        // 高亮处理
+        return articleList.stream().map(item -> {
+            // 获取关键词第一次出现的位置
+            String articleContent = item.getArticleContent();
+            int index = item.getArticleContent().indexOf(keywords);
+            if (index != -1) {
+                // 获取关键词前面的文字
+                int preIndex = index > 25 ? index - 25 : 0;
+                String preText = item.getArticleContent().substring(preIndex, index);
+                // 获取关键词到后面的文字
+                int last = index + keywords.length();
+                int postLength = item.getArticleContent().length() - last;
+                int postIndex = postLength > 175 ? last + 175 : last + postLength;
+                String postText = item.getArticleContent().substring(index, postIndex);
+                // 文章内容高亮
+                articleContent = (preText + postText).replaceAll(keywords, PRE_TAG + keywords + POST_TAG);
+            }
+            // 文章标题高亮
+            String articleTitle = item.getArticleTitle().replaceAll(keywords, PRE_TAG + keywords + POST_TAG);
+            return ArticleSearchDTO.builder()
+                    .id(item.getId())
+                    .articleTitle(articleTitle)
+                    .articleContent(articleContent)
+                    .build();
+        }).collect(Collectors.toList());
+    }
+
+}
+```
+
+##### elasticsearch搜索策略：
+
+```java
+@Log4j2
+@Service("esSearchStrategyImpl")
+public class EsSearchStrategyImpl implements SearchStrategy {
+
+    @Autowired
+    private ElasticsearchRestTemplate elasticsearchRestTemplate;
+
+    @Override
+    public List<ArticleSearchDTO> searchArticle(String keywords) {
+        if (StringUtils.isBlank(keywords)) {
+            return new ArrayList<>();
+        }
+        return search(buildQuery(keywords));
+    }
+
+    /**
+     * 搜索文章构造
+     *
+     * @param keywords 关键字
+     * @return es条件构造器
+     */
+    private NativeSearchQueryBuilder buildQuery(String keywords) {
+        // 条件构造器
+        NativeSearchQueryBuilder nativeSearchQueryBuilder = new NativeSearchQueryBuilder();
+        BoolQueryBuilder boolQueryBuilder = QueryBuilders.boolQuery();
+        // 根据关键词搜索文章标题或内容
+        boolQueryBuilder.must(QueryBuilders.boolQuery().should(QueryBuilders.matchQuery("articleTitle", keywords))
+                        .should(QueryBuilders.matchQuery("articleContent", keywords)))
+                .must(QueryBuilders.termQuery("isDelete", FALSE))
+                .must(QueryBuilders.termQuery("status", PUBLIC.getStatus()));
+        nativeSearchQueryBuilder.withQuery(boolQueryBuilder);
+        return nativeSearchQueryBuilder;
+    }
+
+    /**
+     * 文章搜索结果高亮
+     *
+     * @param nativeSearchQueryBuilder es条件构造器
+     * @return 搜索结果
+     */
+    private List<ArticleSearchDTO> search(NativeSearchQueryBuilder nativeSearchQueryBuilder) {
+        // 添加文章标题高亮
+        HighlightBuilder.Field titleField = new HighlightBuilder.Field("articleTitle");
+        titleField.preTags(PRE_TAG);
+        titleField.postTags(POST_TAG);
+        // 添加文章内容高亮
+        HighlightBuilder.Field contentField = new HighlightBuilder.Field("articleContent");
+        contentField.preTags(PRE_TAG);
+        contentField.postTags(POST_TAG);
+        contentField.fragmentSize(200);
+        nativeSearchQueryBuilder.withHighlightFields(titleField, contentField);
+        // 搜索
+        try {
+            SearchHits<ArticleSearchDTO> search = elasticsearchRestTemplate.search(nativeSearchQueryBuilder.build(), ArticleSearchDTO.class);
+            return search.getSearchHits().stream().map(hit -> {
+                ArticleSearchDTO article = hit.getContent();
+                // 获取文章标题高亮数据
+                List<String> titleHighLightList = hit.getHighlightFields().get("articleTitle");
+                if (CollectionUtils.isNotEmpty(titleHighLightList)) {
+                    // 替换标题数据
+                    article.setArticleTitle(titleHighLightList.get(0));
+                }
+                // 获取文章内容高亮数据
+                List<String> contentHighLightList = hit.getHighlightFields().get("articleContent");
+                if (CollectionUtils.isNotEmpty(contentHighLightList)) {
+                    // 替换内容数据
+                    article.setArticleContent(contentHighLightList.get(contentHighLightList.size() - 1));
+                }
+                return article;
+            }).collect(Collectors.toList());
+        } catch (Exception e) {
+            log.error(e.getMessage());
+        }
+        return new ArrayList<>();
+    }
+
+}
+```
+
+es搜索成功的同时需要用MaxWell+RabbitMQ来进行ElasticSearch---MySQL的数据同步！RabbitMQ中会详细讲到
+
+### RabbitMQ模块
+
+#### 1）邮箱推送
+
+消费者：
+
+```java
+@Component
+@RabbitListener(queues = EMAIL_QUEUE)
+public class EmailConsumer {
+
+    /**
+     * 邮箱号
+     */
+    @Value("${spring.mail.username}")
+    private String email;
+
+    @Autowired
+    private JavaMailSender javaMailSender;
+
+    @RabbitHandler
+    public void process(byte[] data) {
+        EmailDTO emailDTO = JSON.parseObject(new String(data), EmailDTO.class);
+
+//        System.out.println("有个邮件已经开始发送 emailDTO = " + emailDTO);
+
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setFrom(email);
+        message.setTo(emailDTO.getEmail());
+        message.setSubject(emailDTO.getSubject());
+        message.setText(emailDTO.getContent());
+        javaMailSender.send(message);
+
+//        System.out.println("有个邮件已经发送成功 emailDTO = " + emailDTO);
+
+    }
+
+}
+```
+
+生产者：（发送验证码的例子，项目中还有其他通知也是用到的MQ的）
+
+```java
+// 发送验证码
+EmailDTO emailDTO = EmailDTO.builder()
+        .email(username)
+        .subject("ladidol'blog 的验证码")
+        .content("您的验证码为 " + code + " 有效期15分钟，请不要告诉他人哦！")
+        .build();
+rabbitTemplate.convertAndSend(EMAIL_EXCHANGE, "*", new Message(JSON.toJSONBytes(emailDTO), new MessageProperties()));
+```
+
+#### 2）MaxWell监听数据
+
+生产者：(max监听mysql修改的数据)
+
+```bash
+docker pull zendesk/maxwell 
+//下载MaxWell镜像
+docker run --name maxwell --restart=always  -d  zendesk/maxwell bin/maxwell  --user='数据库账号' --password='数据库密码'  --host='数据库ip地址'  --port='数据库端口'  --producer=rabbitmq --rabbitmq_user='账号' --rabbitmq_pass='密码' --rabbitmq_host='ip地址' --rabbitmq_port='端口' --rabbitmq_exchange='maxwell_exchange'  --rabbitmq_exchange_type='fanout' --rabbitmq_exchange_durable='true' --filter='exclude: *.*, include: new_blog.tb_article.article_title = *, include: new_blog.tb_article.article_content = *, include: new_blog.tb_article.is_delete = *, include: new_blog.tb_article.status = *' 
+//运行MaxWell
+```
+
+消费者：
+
+```java
+@Component
+@RabbitListener(queues = MAXWELL_QUEUE)
+public class MaxWellConsumer {
+    @Autowired
+    private ElasticsearchRepository elasticsearchRepository;
+
+    @RabbitHandler
+    public void process(byte[] data) {
+        // 获取监听信息
+        MaxwellDataDTO maxwellDataDTO = JSON.parseObject(new String(data), MaxwellDataDTO.class);
+        // 获取文章数据
+        Article article = JSON.parseObject(JSON.toJSONString(maxwellDataDTO.getData()), Article.class);
+        // 判断操作类型
+        switch (maxwellDataDTO.getType()) {
+            case "insert":
+            case "update":
+                // 更新es文章
+                elasticsearchRepository.save(BeanCopyUtils.copyObject(article, ArticleSearchDTO.class));
+                break;
+            case "delete":
+                // 删除文章
+                elasticsearchRepository.deleteById(article.getId());
+                break;
+            default:
+                break;
+        }
+    }
+
+}
+```
 
 
 
@@ -5909,27 +6197,7 @@ articleId
 
 
 
-### 11）根据条件查询文章(todo 这个接口是来干啥用的)
-
-#### 参数
-
-
-
-#### 简介
-
-前台通过主题id和评论类型查询当前页面的评论，同时有分页查询，默认size为10
-
-#### 实现细节
-
-1. 先查询评论量，如果为空就不进行下面的操作了
-
-
-
-
-
-
-
-### 12）点赞文章
+### 11）点赞文章
 
 #### 参数
 
@@ -5964,7 +6232,7 @@ articleId
 
 
 
-### 13）导出文章
+### 12）导出文章
 
 #### 参数
 
@@ -6008,7 +6276,7 @@ articleIdList
 
 
 
-### 14）导入文章 
+### 13）导入文章 
 
 #### 参数
 
@@ -6029,19 +6297,23 @@ return Result.ok();
 
 
 
-### 15）搜索文章 (todo)
+### 14）搜索文章 
 
 #### 参数
 
-
+keyword
 
 #### 简介
 
-前台通过主题id和评论类型查询当前页面的评论，同时有分页查询，默认size为10
+通过关键字进行搜索
 
 #### 实现细节
 
-1. 先查询评论量，如果为空就不进行下面的操作了
+1. 通过搜索策略进行搜索，elasticsearch还是mysql根据配置文件来设置
+
+2. ```java
+   return searchStrategyContext.executeSearchStrategy(condition.getKeywords());
+   ```
 
 
 
