@@ -1,6 +1,8 @@
 package org.cuit.epoch.service;
 
+import org.cuit.epoch.dto.blog.BlogBackInfoDTO;
 import org.cuit.epoch.dto.blog.BlogHomeInfoDTO;
+import org.cuit.epoch.vo.BlogInfoVO;
 import org.cuit.epoch.vo.WebsiteConfigVO;
 
 /**
@@ -22,14 +24,14 @@ public interface BlogInfoService {
      *
      * @return 博客后台信息
      */
-//    BlogBackInfoDTO getBlogBackInfo();
+    BlogBackInfoDTO getBlogBackInfo();
 
-//    /**
-//     * 保存或更新网站配置
-//     *
-//     * @param websiteConfigVO 网站配置
-//     */
-//    void updateWebsiteConfig(WebsiteConfigVO websiteConfigVO);
+    /**
+     * 保存或更新网站配置
+     *
+     * @param websiteConfigVO 网站配置
+     */
+    void updateWebsiteConfig(WebsiteConfigVO websiteConfigVO);
 
     /**
      * 获取网站配置
@@ -38,23 +40,23 @@ public interface BlogInfoService {
      */
     WebsiteConfigVO getWebsiteConfig();
 
-//    /**
-//     * 获取关于我内容
-//     *
-//     * @return 关于我内容
-//     */
-//    String getAbout();
-//
-//    /**
-//     * 修改关于我内容
-//     *
-//     * @param blogInfoVO 博客信息
-//     */
-//    void updateAbout(BlogInfoVO blogInfoVO);
-//
-//    /**
-//     * 上传访客信息
-//     */
-//    void report();
+    /**
+     * 获取关于我内容
+     *
+     * @return 关于我内容
+     */
+    String getAbout();
+
+    /**
+     * 修改关于我内容
+     *
+     * @param blogInfoVO 博客信息
+     */
+    void updateAbout(BlogInfoVO blogInfoVO);
+
+    /**
+     * 上传访客信息
+     */
+    void report();
 
 }
