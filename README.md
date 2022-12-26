@@ -2394,27 +2394,190 @@ userInfoId
 
 
 
-### 2）查看后台信息（等后面弄了文章模块再来弄一下）
+### 2）查看后台信息
 
 #### 参数
 
-无参数。
+无参数。你只需要登录到后台就行了。
 
 #### 简介
 
-就是博客首页，但是这个博客首页后端直接返回给前端一些基本信息，比如博客网站的基本信息、是否展示某些页面、是否可用一些功能、博客全部页面的基本信息（首页，归档，分类，标签等等）。从而可以提高一些页面的访问速度。
+博客后台首页基本信息获取接口，这个接口能得到的东西挺多的，比如：访问量、留言量、用户量、文章量、最近一周用户访问量、文章日历统计、分类数据、标签数据、redis访问量前五的文章
 
 #### 实现细节
 
-1. 依旧是分开查询不同的表不同的信息，然后封装到同一个对象中
+1. 依旧是分开查询不同的表不同的信息or从redis中查询，然后封装到同一个对象中
 
+   ```java
+   // 查询访问量
+   Object count = redisService.get(BLOG_VIEWS_COUNT);
+   Integer viewsCount = Integer.parseInt(Optional.ofNullable(count).orElse(0).toString());
+   // 查询留言量
+   Integer messageCount = messageDao.selectCount(null);
+   // 查询用户量
+   Integer userCount = userInfoDao.selectCount(null);
+   // 查询文章量
+   Integer articleCount = articleDao.selectCount(new LambdaQueryWrapper<Article>()
+           .eq(Article::getIsDelete, FALSE));
+   // 查询一周用户访问量
+   List<UniqueViewDTO> uniqueViewList = uniqueViewService.listUniqueViews();
+   // 查询文章按日期统计
+   List<ArticleStatisticsDTO> articleStatisticsList = articleDao.listArticleStatistics();
+   // 查询分类数据
+   List<CategoryDTO> categoryDTOList = categoryDao.listCategoryDTO();
+   // 查询标签数据
+   List<TagDTO> tagDTOList = BeanCopyUtils.copyList(tagDao.selectList(null), TagDTO.class);
+   // 查询redis访问量前五的文章
+   Map<Object, Double> articleMap = redisService.zReverseRangeWithScore(ARTICLE_VIEWS_COUNT, 0, 4);
+   ```
 
+   result封装
 
+   ```java
+   BlogBackInfoDTO blogBackInfoDTO = BlogBackInfoDTO.builder()
+           .articleStatisticsList(articleStatisticsList)
+           .tagDTOList(tagDTOList)
+           .viewsCount(viewsCount)
+           .messageCount(messageCount)
+           .userCount(userCount)
+           .articleCount(articleCount)
+           .categoryDTOList(categoryDTOList)
+           .uniqueViewDTOList(uniqueViewList)
+           .build();
+   if (CollectionUtils.isNotEmpty(articleMap)) {
+       // 查询文章排行
+       List<ArticleRankDTO> articleRankDTOList = listArticleRank(articleMap);
+       blogBackInfoDTO.setArticleRankDTOList(articleRankDTOList);
+   }
+   return blogBackInfoDTO;
+   ```
 
+#### 注意
 
+可以学习的一些业务实现方式
 
+1. **对每天用户唯一访问量的持久化实现**
 
+   主要通过定时任务来实现
 
+   ```java
+   @Scheduled(cron = " 0 0 0 * * ?", zone = "Asia/Shanghai")
+   public void saveUniqueView() {
+       // 获取每天用户量
+       Long count = redisService.sSize(UNIQUE_VISITOR);
+       // 获取昨天日期插入数据
+       UniqueView uniqueView = UniqueView.builder()
+               .createTime(LocalDateTimeUtil.offset(LocalDateTime.now(ZoneId.of(SHANGHAI.getZone())), -1, ChronoUnit.DAYS))
+               .viewsCount(Optional.of(count.intValue()).orElse(0))
+               .build();
+       uniqueViewDao.insert(uniqueView);
+   }
+   ```
+
+   ```java
+   @Scheduled(cron = " 0 1 0 * * ?", zone = "Asia/Shanghai")
+   public void clear() {
+       // 清空redis访客记录
+       redisService.del(UNIQUE_VISITOR);
+       // 清空redis游客区域统计
+       redisService.del(VISITOR_AREA);
+   }
+   ```
+
+   想要得到最近一周的唯一访问量数据就比较简单了
+
+   ```java
+   @Override
+   public List<UniqueViewDTO> listUniqueViews() {
+       DateTime startTime = DateUtil.beginOfDay(DateUtil.offsetDay(new Date(), -7));
+       DateTime endTime = DateUtil.endOfDay(new Date());
+       return uniqueViewDao.listUniqueViews(startTime, endTime);
+   }
+   ```
+
+   ```xml
+   <select id="listUniqueViews" resultType="org.cuit.epoch.dto.blog.UniqueViewDTO">
+       SELECT
+           DATE_FORMAT( create_time, "%Y-%m-%d" ) as `day`,
+           views_count
+       FROM
+           `tb_unique_view`
+       WHERE
+           create_time > #{startTime}
+         AND create_time <=  #{endTime}
+       ORDER BY
+           create_time
+   </select>
+   ```
+
+2. **文章按照日期统计个数**
+
+   ```xml
+   <select id="listArticleStatistics" resultType="org.cuit.epoch.dto.article.ArticleStatisticsDTO">
+       SELECT
+           DATE_FORMAT( create_time, "%Y-%m-%d" ) AS date,
+           COUNT( 1 ) AS count
+       FROM
+           tb_article
+       GROUP BY
+           date
+       ORDER BY
+           date DESC
+   </select>
+   ```
+
+3. **分类数据的文章个数（子查询）**
+
+   ```xml
+   <select id="listCategoryDTO" resultType="org.cuit.epoch.dto.category.CategoryDTO">
+       SELECT
+       c.id,
+       c.category_name,
+       COUNT( a.id ) AS article_count
+       FROM
+       tb_category c
+       LEFT JOIN ( SELECT id, category_id FROM tb_article WHERE is_delete = 0 AND `status` = 1 ) a ON c.id = a.category_id
+       GROUP BY
+       c.id
+   </select>
+   ```
+
+4. **查询redis中访问量前五的文章**
+
+   先得到前五的文章id-count map
+
+   通过map查询文章名字
+
+   ```java
+   // 查询redis访问量前五的文章
+   Map<Object, Double> articleMap = redisService.zReverseRangeWithScore(ARTICLE_VIEWS_COUNT, 0, 4);
+   ```
+
+   ```java
+   if (CollectionUtils.isNotEmpty(articleMap)) {
+       // 查询文章排行
+       List<ArticleRankDTO> articleRankDTOList = listArticleRank(articleMap);
+       blogBackInfoDTO.setArticleRankDTOList(articleRankDTOList);
+   }
+   ```
+
+   ```java
+   private List<ArticleRankDTO> listArticleRank(Map<Object, Double> articleMap) {
+       // 提取文章id
+       List<Integer> articleIdList = new ArrayList<>(articleMap.size());
+       articleMap.forEach((key, value) -> articleIdList.add((Integer) key));
+       // 查询文章信息
+       return articleDao.selectList(new LambdaQueryWrapper<Article>()
+                       .select(Article::getId, Article::getArticleTitle)
+                       .in(Article::getId, articleIdList))
+               .stream().map(article -> ArticleRankDTO.builder()
+                       .articleTitle(article.getArticleTitle())
+                       .viewsCount(articleMap.get(article.getId()).intValue())
+                       .build())
+               .sorted(Comparator.comparingInt(ArticleRankDTO::getViewsCount).reversed())
+               .collect(Collectors.toList());
+   }
+   ```
 
 
 
@@ -2435,6 +2598,220 @@ userInfoId
    ```java
    uploadStrategyContext.executeUploadStrategy(file, FilePathEnum.CONFIG.getPath())
    ```
+
+
+
+### 4）更新网站配置
+
+#### 参数
+
+
+
+#### 简介
+
+就是前端传的数据对象，应该网站配置只有一个，所以就对一行数据进行修改就行
+
+![image-20221226160933730](https://figurebed-ladidol.oss-cn-chengdu.aliyuncs.com/img/202212261609880.png)
+
+访问提升速度用到了redis缓存
+
+#### 实现细节
+
+1. 更新的话，就先更新数据库，再删除缓存
+
+   ```java
+   // 修改网站配置
+   WebsiteConfig websiteConfig = WebsiteConfig.builder()
+           .id(1)
+           .config(JSON.toJSONString(websiteConfigVO))
+           .build();
+   websiteConfigDao.updateById(websiteConfig);
+   // 删除缓存
+   redisService.del(WEBSITE_CONFIG);
+   ```
+
+
+
+### 5）获取网站配置
+
+#### 参数
+
+无
+
+#### 简介
+
+后台查看网站配置，或者前台首页的时候会调用这个方法得到前台网站配置，从而对前端一些布局等等的修改
+
+
+
+#### 实现细节
+
+1. 先通过缓存获取，如果没有就从数据库中加载并更新缓存
+
+2. ```java
+   WebsiteConfigVO websiteConfigVO;
+   // 获取缓存数据
+   Object websiteConfig = redisService.get(WEBSITE_CONFIG);
+   if (Objects.nonNull(websiteConfig)) {
+       websiteConfigVO = JSON.parseObject(websiteConfig.toString(), WebsiteConfigVO.class);
+   } else {
+       // 从数据库中加载
+       String config = websiteConfigDao.selectById(DEFAULT_CONFIG_ID).getConfig();
+       websiteConfigVO = JSON.parseObject(config, WebsiteConfigVO.class);
+       redisService.set(WEBSITE_CONFIG, config);
+   }
+   return websiteConfigVO;
+   ```
+
+
+
+
+
+
+
+
+
+### 6）查看关于我信息
+
+#### 参数
+
+无。
+
+#### 简介
+
+从redis缓存中获取about信息
+
+![image-20221226161823018](https://figurebed-ladidol.oss-cn-chengdu.aliyuncs.com/img/202212261618102.png)
+
+#### 实现细节
+
+1. 得到信息
+
+   ```java
+   Object value = redisService.get(ABOUT);
+   return Objects.nonNull(value) ? value.toString() : "";
+   ```
+
+
+
+
+
+
+
+
+
+### 7）修改关于我信息
+
+#### 参数
+
+aboutContent：属于md语法的文本
+
+#### 简介
+
+修改redis中的about信息就行了
+
+#### 实现细节
+
+1. 修改
+
+   ```java
+   redisService.set(ABOUT, blogInfoVO.getAboutContent());
+   ```
+
+
+
+
+
+
+
+### 8）上传访客信息
+
+#### 参数
+
+通过请求拿到ip+访问设备+浏览器等等
+
+#### 简介
+
+将用户的唯一标识存入缓存中去
+
+![image-20221226162229764](https://figurebed-ladidol.oss-cn-chengdu.aliyuncs.com/img/202212261622882.png)
+
+#### 实现细节
+
+同时统计游客地区分布
+
+```java
+// 获取ip
+String ipAddress = IpUtils.getIpAddress(request);
+// 获取访问设备
+UserAgent userAgent = IpUtils.getUserAgent(request);
+Browser browser = userAgent.getBrowser();
+OperatingSystem operatingSystem = userAgent.getOperatingSystem();
+// 生成唯一用户标识
+String uuid = ipAddress + browser.getName() + operatingSystem.getName();
+String md5 = DigestUtils.md5DigestAsHex(uuid.getBytes());
+// 判断是否访问
+if (!redisService.sIsMember(UNIQUE_VISITOR, md5)) {
+    // 统计游客地域分布
+    String ipSource = IpUtils.getIpSource(ipAddress);
+    if (StringUtils.isNotBlank(ipSource)) {
+        ipSource = ipSource.substring(0, 2)
+                .replaceAll(PROVINCE, "")
+                .replaceAll(CITY, "");
+        redisService.hIncr(VISITOR_AREA, ipSource, 1L);
+    } else {
+        redisService.hIncr(VISITOR_AREA, UNKNOWN, 1L);
+    }
+    // 访问量+1
+    redisService.incr(BLOG_VIEWS_COUNT, 1);
+    // 保存唯一标识
+    redisService.sAdd(UNIQUE_VISITOR, md5);
+}
+```
+
+
+
+
+
+### 9）上传语音（todo）
+
+#### 参数
+
+图片文件。
+
+#### 简介
+
+就是图床上传就行
+
+#### 实现细节
+
+1. 属于配置范畴的图片
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
