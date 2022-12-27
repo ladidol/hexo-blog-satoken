@@ -47,7 +47,6 @@ public class TalkServiceImpl extends ServiceImpl<TalkMapper, Talk> implements Ta
     @Autowired
     private RedisService redisService;
 
-    // TODO: 2022/12/12 这里的首页展示说说，只查询说说的内容，因为存入
     @Override
     public List<String> listHomeTalks() {
         // 查询最新10条说说

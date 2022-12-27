@@ -10,7 +10,7 @@
     </parent>
     <groupId>org.cuit.epoch</groupId>
     <artifactId>hexo-blog-satoken</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
+    <version>0.0.1</version>
     <name>hexo-blog-satoken</name>
     <description>hexo-blog-satoken</description>
     <properties>

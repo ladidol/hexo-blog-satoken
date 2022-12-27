@@ -180,7 +180,6 @@ public class ArticleController {
         return Result.ok(articleService.listArticlesByCondition(condition));
     }
 
-    // TODO: 2022/12/17 es或者mysql搜索
 
     /**
      * 搜索文章

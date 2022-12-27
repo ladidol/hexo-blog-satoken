@@ -377,11 +377,9 @@ public class UserAuthServiceImpl extends ServiceImpl<UserAuthMapper, UserAuth> i
      * @return 结果
      */
     private Boolean checkUser(UserVO user) {
-//        if (!user.getCode().equals(redisService.get(USER_CODE_KEY + user.getUsername()))) {
-//            throw new AppException("验证码错误！");
-//        }
-        // TODO: 2022/11/18 开发期间先将邮箱验证关闭
-
+        if (!user.getCode().equals(redisService.get(USER_CODE_KEY + user.getUsername()))) {
+            throw new AppException("验证码错误！");
+        }
         //查询用户名是否存在
         UserAuth userAuth = userAuthMapper.selectOne(new LambdaQueryWrapper<UserAuth>()
                 .select(UserAuth::getUsername)
