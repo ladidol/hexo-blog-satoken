@@ -4,6 +4,7 @@ import cn.dev33.satoken.stp.StpUtil;
 import com.alibaba.fastjson.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import org.cuit.epoch.dto.UserDetailDTO;
 import org.cuit.epoch.dto.comment.CommentCountDTO;
 import org.cuit.epoch.dto.talk.TalkBackDTO;
 import org.cuit.epoch.dto.talk.TalkDTO;
@@ -24,13 +25,13 @@ import org.cuit.epoch.vo.page.PageResult;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
-import static org.cuit.epoch.constant.RedisPrefixConst.TALK_LIKE_COUNT;
-import static org.cuit.epoch.constant.RedisPrefixConst.TALK_USER_LIKE;
+import static org.cuit.epoch.constant.RedisPrefixConst.*;
 
 /**
  * @author: Xiaoqiang-Ladidol
@@ -74,12 +75,18 @@ public class TalkServiceImpl extends ServiceImpl<TalkMapper, Talk> implements Ta
         // 分页查询说说
         List<TalkDTO> talkDTOList = talkDao.listTalks(PageUtils.getLimitCurrent(), PageUtils.getSize());
         // 查询说说评论量
+        System.out.println("talkDTOList = " + talkDTOList);
         List<Integer> talkIdList = talkDTOList.stream()
                 .map(TalkDTO::getId)
                 .collect(Collectors.toList());
-        Map<Integer, Integer> commentCountMap = commentDao.listCommentCountByTopicIds(talkIdList)
-                .stream()
-                .collect(Collectors.toMap(CommentCountDTO::getId, CommentCountDTO::getCommentCount));
+        Map<Integer, Integer> commentCountMap;
+        if (!talkIdList.isEmpty()){
+            commentCountMap = commentDao.listCommentCountByTopicIds(talkIdList)
+                    .stream()
+                    .collect(Collectors.toMap(CommentCountDTO::getId, CommentCountDTO::getCommentCount));
+        } else {
+            commentCountMap = new HashMap<>();
+        }
         // 查询说说点赞量
         Map<String, Object> likeCountMap = redisService.hGetAll(TALK_LIKE_COUNT);
         talkDTOList.forEach(item -> {
@@ -134,7 +141,9 @@ public class TalkServiceImpl extends ServiceImpl<TalkMapper, Talk> implements Ta
     @Override
     public void saveOrUpdateTalk(TalkVO talkVO) {
         Talk talk = BeanCopyUtils.copyObject(talkVO, Talk.class);
-        talk.setUserId(StpUtil.getLoginIdAsInt());
+        // 拿到用户信息
+        UserDetailDTO userDetailDTO = (UserDetailDTO) StpUtil.getSession().get(USER_INFO);
+        talk.setUserId(userDetailDTO.getUserInfoId());
         this.saveOrUpdate(talk);
     }
 
