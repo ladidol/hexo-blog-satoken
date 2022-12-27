@@ -1271,6 +1271,344 @@ public class NormalArticleImportStrategyImpl implements ArticleImportStrategy {
 }
 ```
 
+### WebSocket实现聊天室模块（todo）
+
+#### 配置准备
+
+对WebSocket的初步了解可以看一下这个视频：[SpringBoot集成WebSocket实现网页聊天_哔哩哔哩_bilibili](https://www.bilibili.com/video/BV12Q4y1q7VP/?spm_id_from=333.337.search-card.all.click&vd_source=3ee74e97a596580dcf2e42cfeaafd7e9)
+
+本项目主要使用了群聊功能（广播），就没有一对一私聊
+
+配置类：
+
+```java
+@Configuration
+public class WebSocketConfig {
+
+    /**
+     *
+     * 注入一个ServerEndpointExporter，该Bean会自动注册使用@ServerEndpoint注解申明的websocket endpoint
+     * @return
+     */
+    @Bean
+    public ServerEndpointExporter serverEndpointExporter() {
+        return new ServerEndpointExporter();
+    }
+
+}
+```
+
+服务类：
+
+```java
+/**
+ * @author: Xiaoqiang-Ladidol
+ * @date: 2022/12/26 16:35
+ * @description: {websocket服务}
+ * 服务器端和浏览器端互相通信的一个服务（双通道ws，有别于controller的http单通道）
+ */
+@Data
+@Service
+@ServerEndpoint(value = "/websocket", configurator = WebSocketServiceImpl.ChatConfigurator.class)
+public class WebSocketServiceImpl {
+
+    /**
+     * 用户session
+     */
+    private Session session;
+
+    /**
+     * 用户session集合，当前连接数
+     */
+    private static CopyOnWriteArraySet<WebSocketServiceImpl> webSocketSet = new CopyOnWriteArraySet<>();
+
+    @Autowired
+    public void setChatRecordDao(ChatRecordMapper chatRecordDao) {
+        WebSocketServiceImpl.chatRecordDao = chatRecordDao;
+    }
+
+    @Autowired
+    public void setUploadStrategyContext(UploadStrategyContext uploadStrategyContext) {
+        WebSocketServiceImpl.uploadStrategyContext = uploadStrategyContext;
+    }
+
+    private static ChatRecordMapper chatRecordDao;
+
+    private static UploadStrategyContext uploadStrategyContext;
+
+    /**
+     * 获取客户端真实ip
+     */
+    public static class ChatConfigurator extends ServerEndpointConfig.Configurator {
+
+        public static String HEADER_NAME = "X-Real-IP";
+
+        @Override
+        public void modifyHandshake(ServerEndpointConfig sec, HandshakeRequest request, HandshakeResponse response) {
+            try {
+                String firstFoundHeader = request.getHeaders().get(HEADER_NAME.toLowerCase()).get(0);
+                sec.getUserProperties().put(HEADER_NAME, firstFoundHeader);
+            } catch (Exception e) {
+                sec.getUserProperties().put(HEADER_NAME, "未知ip");
+            }
+        }
+    }
+
+    /**
+     * 连接建立成功调用的方法
+     * desc：一个客户端的产生，会自动调用这个方法
+     */
+    @OnOpen
+    public void onOpen(Session session, EndpointConfig endpointConfig) throws IOException {
+    }
+
+    /**
+     * 收到客户端消息后调用的方法
+     *
+     * @param message 客户端发送过来的消息
+     */
+    @OnMessage
+    public void onMessage(String message, Session session) throws IOException {
+    }
+
+    /**
+     * 连接关闭调用的方法
+     */
+    @OnClose
+    public void onClose() throws IOException {
+
+    }
+}
+```
+
+往返浏览器和服务器之间的消息种类：
+
+```java
+@Getter
+@AllArgsConstructor
+public enum ChatTypeEnum {
+    /**
+     * 在线人数
+     */
+    ONLINE_COUNT(1, "在线人数"),
+    /**
+     * 历史记录
+     */
+    HISTORY_RECORD(2, "历史记录"),
+    /**
+     * 发送消息
+     */
+    SEND_MESSAGE(3, "发送消息"),
+    /**
+     * 撤回消息
+     */
+    RECALL_MESSAGE(4, "撤回消息"),
+    /**
+     * 语音消息
+     */
+    VOICE_MESSAGE(5,"语音消息"),
+    /**
+     * 心跳消息
+     */
+    HEART_BEAT(6,"心跳消息");
+
+    /**
+     * 类型
+     */
+    private final Integer type;
+
+    /**
+     * 描述
+     */
+    private final String desc;
+
+    /**
+     * 根据类型获取枚举
+     * @param type 类型
+     * @return 枚举
+     */
+    public static ChatTypeEnum getChatType(Integer type) {
+        for (ChatTypeEnum chatType : ChatTypeEnum.values()) {
+            if (chatType.getType().equals(type)) {
+                return chatType;
+            }
+        }
+        return null;
+    }
+
+}
+```
+
+#### 具体实现
+
+websocket主要是三个情况：OnOpen、OnClose、OnMessage三个情况，分别执行于最开始建立连接（开启聊天室）、关闭连接（关闭聊天室or关闭浏览器）、接收到客户端来的消息时执行的方法
+
+@OnOpen
+
+> 一个客户端的产生，会自动调用这个方法，给当前加入聊天似的用户加载历史聊天记录，并更新在线人数，同时服务器端得到新的在线用户。
+
+```java
+/**
+ * 连接建立成功调用的方法
+ * desc：一个客户端的产生，会自动调用这个方法，给当前加入聊天似的用户加载历史聊天记录，并更新在线人数，同时服务器端得到新的在线用户。
+ */
+@OnOpen
+public void onOpen(Session session, EndpointConfig endpointConfig) throws IOException {
+    // 加入连接
+    this.session = session;
+    webSocketSet.add(this);
+    // 更新在线人数
+    updateOnlineCount();
+    // 加载历史聊天记录
+    ChatRecordDTO chatRecordDTO = listChartRecords(endpointConfig);
+    // 发送消息
+    WebsocketMessageDTO messageDTO = WebsocketMessageDTO.builder()
+            .type(HISTORY_RECORD.getType())
+            .data(chatRecordDTO)
+            .build();
+    // 锁住当前session的其他访问
+    synchronized (session) {
+        session.getBasicRemote().sendText(JSON.toJSONString(messageDTO));
+    }
+}
+```
+
+@OnMessage
+
+```java
+/**
+ * 收到客户端消息后调用的方法
+ *
+ * @param message 客户端发送过来的消息
+ */
+@OnMessage
+public void onMessage(String message, Session session) throws IOException {
+    WebsocketMessageDTO messageDTO = JSON.parseObject(message, WebsocketMessageDTO.class);
+    switch (Objects.requireNonNull(getChatType(messageDTO.getType()))) {
+        case SEND_MESSAGE:
+            // 发送消息
+            ChatRecord chatRecord = JSON.parseObject(JSON.toJSONString(messageDTO.getData()), ChatRecord.class);
+            // 过滤html标签
+            chatRecord.setContent(HTMLUtils.filter(chatRecord.getContent()));
+            chatRecordDao.insert(chatRecord);
+            messageDTO.setData(chatRecord);
+            // 广播消息
+            broadcastMessage(messageDTO);
+            break;
+        case RECALL_MESSAGE:
+            // 撤回消息
+            RecallMessageDTO recallMessage = JSON.parseObject(JSON.toJSONString(messageDTO.getData()), RecallMessageDTO.class);
+            // 删除记录
+            chatRecordDao.deleteById(recallMessage.getId());
+            // 广播消息
+            broadcastMessage(messageDTO);
+            break;
+        case HEART_BEAT:
+            // 心跳消息
+            messageDTO.setData("pong");
+            session.getBasicRemote().sendText(JSON.toJSONString(JSON.toJSONString(messageDTO)));
+        default:
+            break;
+    }
+}
+```
+
+@OnClose
+
+```java
+/**
+ * 连接关闭调用的方法
+ */
+@OnClose
+public void onClose() throws IOException {
+    // 更新在线人数
+    webSocketSet.remove(this);
+    updateOnlineCount();
+}
+```
+
+一些具体方法的实现：
+
+本项目将消息持久化到数据库中了，消息中存在语音信息
+
+```java
+/**
+ * 加载历史聊天记录
+ *
+ * @param endpointConfig 配置
+ * @return 加载历史聊天记录
+ */
+private ChatRecordDTO listChartRecords(EndpointConfig endpointConfig) {
+    // 获取聊天历史记录
+    List<ChatRecord> chatRecordList = chatRecordDao.selectList(new LambdaQueryWrapper<ChatRecord>()
+            .ge(ChatRecord::getCreateTime, DateUtil.offsetHour(new Date(), -12)));
+    // 获取当前用户ip
+    String ipAddress = endpointConfig.getUserProperties().get(ChatConfigurator.HEADER_NAME).toString();
+    return ChatRecordDTO.builder()
+            .chatRecordList(chatRecordList)
+            .ipAddress(ipAddress)
+            .ipSource(IpUtils.getIpSource(ipAddress))
+            .build();
+}
+
+/**
+ * 更新在线人数
+ *
+ * @throws IOException io异常
+ */
+@Async
+public void updateOnlineCount() throws IOException {
+    // 获取当前在线人数
+    WebsocketMessageDTO messageDTO = WebsocketMessageDTO.builder()
+            .type(ONLINE_COUNT.getType())
+            .data(webSocketSet.size())
+            .build();
+    // 广播消息
+    broadcastMessage(messageDTO);
+}
+
+/**
+ * 发送语音
+ *
+ * @param voiceVO 语音路径
+ */
+public void sendVoice(VoiceVO voiceVO) {
+    // 上传语音文件
+    String content = uploadStrategyContext.executeUploadStrategy(voiceVO.getFile(), FilePathEnum.VOICE.getPath());
+    voiceVO.setContent(content);
+    // 保存记录
+    ChatRecord chatRecord = BeanCopyUtils.copyObject(voiceVO, ChatRecord.class);
+    chatRecordDao.insert(chatRecord);
+    // 发送消息
+    WebsocketMessageDTO messageDTO = WebsocketMessageDTO.builder()
+            .type(VOICE_MESSAGE.getType())
+            .data(chatRecord)
+            .build();
+    // 广播消息
+    try {
+        broadcastMessage(messageDTO);
+    } catch (IOException e) {
+        e.printStackTrace();
+    }
+}
+
+/**
+ * 广播消息
+ *
+ * @param messageDTO 消息dto
+ * @throws IOException io异常
+ */
+private void broadcastMessage(WebsocketMessageDTO messageDTO) throws IOException {
+    for (WebSocketServiceImpl webSocketService : webSocketSet) {
+        synchronized (webSocketService.session) {
+            webSocketService.session.getBasicRemote().sendText(JSON.toJSONString(messageDTO));
+        }
+    }
+}
+```
+
+
+
 
 
 ## 登录模块
@@ -2773,21 +3111,60 @@ if (!redisService.sIsMember(UNIQUE_VISITOR, md5)) {
 
 
 
-### 9）上传语音（todo）
+### 9）上传语音
 
 #### 参数
 
-图片文件。
+语音文件
 
 #### 简介
 
-就是图床上传就行
+将聊天室中产生的语音文件保存到后端
 
 #### 实现细节
 
-1. 属于配置范畴的图片
+1. 将文件上传到文件服务器，通过保存url进行持久化，同时要更新聊天记录
 
+   ```java
+   // 上传语音文件
+   String content = uploadStrategyContext.executeUploadStrategy(voiceVO.getFile(), FilePathEnum.VOICE.getPath());
+   voiceVO.setContent(content);
+   // 保存记录
+   ChatRecord chatRecord = BeanCopyUtils.copyObject(voiceVO, ChatRecord.class);
+   chatRecordDao.insert(chatRecord);
+   ```
 
+2. 广播消息，发给聊天室的所有成员界面
+
+   ```java
+   // 发送消息
+   WebsocketMessageDTO messageDTO = WebsocketMessageDTO.builder()
+           .type(VOICE_MESSAGE.getType())
+           .data(chatRecord)
+           .build();
+   // 广播消息
+   try {
+       broadcastMessage(messageDTO);
+   } catch (IOException e) {
+       e.printStackTrace();
+   }
+   ```
+
+   ```java
+   /**
+    * 广播消息
+    *
+    * @param messageDTO 消息dto
+    * @throws IOException io异常
+    */
+   private void broadcastMessage(WebsocketMessageDTO messageDTO) throws IOException {
+       for (WebSocketServiceImpl webSocketService : webSocketSet) {
+           synchronized (webSocketService.session) {
+               webSocketService.session.getBasicRemote().sendText(JSON.toJSONString(messageDTO));
+           }
+       }
+   }
+   ```
 
 
 
