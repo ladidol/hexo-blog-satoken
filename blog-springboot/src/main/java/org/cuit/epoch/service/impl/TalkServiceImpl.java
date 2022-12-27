@@ -75,7 +75,6 @@ public class TalkServiceImpl extends ServiceImpl<TalkMapper, Talk> implements Ta
         // 分页查询说说
         List<TalkDTO> talkDTOList = talkDao.listTalks(PageUtils.getLimitCurrent(), PageUtils.getSize());
         // 查询说说评论量
-        System.out.println("talkDTOList = " + talkDTOList);
         List<Integer> talkIdList = talkDTOList.stream()
                 .map(TalkDTO::getId)
                 .collect(Collectors.toList());
