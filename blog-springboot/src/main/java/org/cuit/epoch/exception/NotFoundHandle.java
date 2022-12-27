@@ -1,4 +1,4 @@
-package org.cuit.epoch.current;
+package org.cuit.epoch.exception;
 
 import org.cuit.epoch.util.Result;
 import org.springframework.boot.web.servlet.error.ErrorController;

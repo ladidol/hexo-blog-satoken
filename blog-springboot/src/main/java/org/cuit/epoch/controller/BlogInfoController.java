@@ -3,14 +3,17 @@ package org.cuit.epoch.controller;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiImplicitParam;
 import io.swagger.annotations.ApiOperation;
+import lombok.extern.slf4j.Slf4j;
 import org.cuit.epoch.annotation.OptLog;
 import org.cuit.epoch.dto.blog.BlogBackInfoDTO;
 import org.cuit.epoch.dto.blog.BlogHomeInfoDTO;
 import org.cuit.epoch.enums.FilePathEnum;
 import org.cuit.epoch.service.BlogInfoService;
+import org.cuit.epoch.service.impl.WebSocketServiceImpl;
 import org.cuit.epoch.strategy.context.UploadStrategyContext;
 import org.cuit.epoch.util.Result;
 import org.cuit.epoch.vo.BlogInfoVO;
+import org.cuit.epoch.vo.VoiceVO;
 import org.cuit.epoch.vo.WebsiteConfigVO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -27,11 +30,12 @@ import static org.cuit.epoch.constant.OptTypeConst.UPDATE;
  */
 @Api(tags = "博客信息模块")
 @RestController
+@Slf4j
 public class BlogInfoController {
     @Autowired
     private BlogInfoService blogInfoService;
-//    @Autowired
-//    private WebSocketServiceImpl webSocketService;
+    @Autowired
+    private WebSocketServiceImpl webSocketService;
     @Autowired
     private UploadStrategyContext uploadStrategyContext;
 
@@ -125,12 +129,15 @@ public class BlogInfoController {
      * @param voiceVO 语音信息
      * @return {@link Result<String>} 语音地址
      */
-//    @ApiOperation(value = "上传语音")
-//    @PostMapping("/voice")
-//    public Result<String> sendVoice(VoiceVO voiceVO) {
-//        webSocketService.sendVoice(voiceVO);
-//        return Result.ok();
-//    }
+    @ApiOperation(value = "上传语音")
+    @PostMapping("/voice")
+    public Result<String> sendVoice(VoiceVO voiceVO) {
+
+        log.info(String.valueOf(voiceVO));
+
+        webSocketService.sendVoice(voiceVO);
+        return Result.ok();
+    }
 
     /**
      * 上传访客信息

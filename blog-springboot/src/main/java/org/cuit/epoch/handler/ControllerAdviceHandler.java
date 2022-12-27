@@ -1,5 +1,6 @@
 package org.cuit.epoch.handler;
 
+import cn.dev33.satoken.exception.NotLoginException;
 import lombok.extern.log4j.Log4j2;
 import org.cuit.epoch.exception.AppException;
 import org.cuit.epoch.util.Result;
@@ -44,6 +45,20 @@ public class ControllerAdviceHandler {
     }
 
     /**
+     * 处理SaToken异常
+     *
+     * @param e 异常
+     * @return 接口异常信息
+     */
+    @ExceptionHandler(value = NotLoginException.class)
+    public Result<?> errorHandler(NotLoginException e) {
+        // 如果是未登录异常
+        log.warn(e.getMessage());
+        return Result.fail("登录过期 or 未登录，请尝试重新登录");
+    }
+
+
+    /**
      * 处理系统异常
      *
      * @param e 异常
@@ -54,5 +69,6 @@ public class ControllerAdviceHandler {
         e.printStackTrace();
         return Result.fail(SYSTEM_ERROR.getCode(), SYSTEM_ERROR.getDesc());
     }
+
 
 }

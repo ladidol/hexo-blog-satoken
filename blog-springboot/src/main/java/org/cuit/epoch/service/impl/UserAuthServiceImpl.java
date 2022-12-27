@@ -1,5 +1,7 @@
 package org.cuit.epoch.service.impl;
 
+import cn.dev33.satoken.exception.NotLoginException;
+import cn.dev33.satoken.session.SaSession;
 import cn.dev33.satoken.stp.StpUtil;
 import com.alibaba.fastjson.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -126,9 +128,9 @@ public class UserAuthServiceImpl extends ServiceImpl<UserAuthMapper, UserAuth> i
         //将用户UserInfo存到redis中，方便后序对在线人数进行判断
         Set<UserDetailDTO> onlineUsers = (Set<UserDetailDTO>) redisService.get(USER_ONLINE);
         onlineUsers.add(userDetailDTO);
-        for (UserDetailDTO onlineUser : onlineUsers) {
-            log.info("onlineUser = " + onlineUser);
-        }
+//        for (UserDetailDTO onlineUser : onlineUsers) {
+//            log.info("onlineUser = " + onlineUser);
+//        }
         redisService.set(USER_ONLINE, onlineUsers);
 
 //        //用户redis信息添加
@@ -155,7 +157,14 @@ public class UserAuthServiceImpl extends ServiceImpl<UserAuthMapper, UserAuth> i
 
         //将用户UserInfo从redis中删除
         Set<Integer> onlineUsers = (Set<Integer>) redisService.get(USER_ONLINE);
-        UserDetailDTO userDetailDTO = (UserDetailDTO) StpUtil.getSession().get(USER_INFO);
+        SaSession SaSession = null;
+        try {
+            SaSession = StpUtil.getSession();
+        } catch (NotLoginException e) {
+            log.warn("token 已经过期了");
+            return ;
+        }
+        UserDetailDTO userDetailDTO = (UserDetailDTO) SaSession.get(USER_INFO);
         onlineUsers.remove(userDetailDTO);
         redisService.set(USER_ONLINE, onlineUsers);
 
