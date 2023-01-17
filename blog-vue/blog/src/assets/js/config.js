@@ -1,7 +1,7 @@
 export default {
-  QQ_APP_ID: "101878726",
-  QQ_REDIRECT_URI: "https://www.talkxj.com/oauth/login/qq",
-  WEIBO_APP_ID: "4039197195",
-  WEIBO_REDIRECT_URI: "https://www.talkxj.com/oauth/login/weibo",
+  QQ_APP_ID: "102038542",
+  QQ_REDIRECT_URI: "http://blog.ladidol.top/oauth/login/qq",
+  WEIBO_APP_ID: "83843779",
+  WEIBO_REDIRECT_URI: "http://blog.ladidol.top/oauth/login/weibo",
   TENCENT_CAPTCHA: "2088053498"
 };

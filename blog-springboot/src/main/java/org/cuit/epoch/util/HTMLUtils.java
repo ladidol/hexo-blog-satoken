@@ -29,8 +29,8 @@ public class HTMLUtils {
      * @return 过滤后的内容
      */
     public static String filter(String source) {
-        // 敏感词过滤
-        source = WORD_BS.replace(source);
+        // 敏感词过滤，过于敏感了
+//        source = WORD_BS.replace(source);
         // 保留图片标签
         source = source.replaceAll("(?!<(img).*?>)<.*?>", "")
                 .replaceAll("(onload(.*?)=)", "")

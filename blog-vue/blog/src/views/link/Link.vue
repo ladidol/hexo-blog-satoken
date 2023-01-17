@@ -7,7 +7,7 @@
     <!-- 链接列表 -->
     <v-card class="blog-container">
       <div class="link-title mb-1">
-        <v-icon color="blue">mdi-link-variant</v-icon> 大佬链接
+        <v-icon color="blue">mdi-link-variant</v-icon> 友情链接
       </div>
       <v-row class="link-container">
         <v-col
