@@ -10,6 +10,7 @@ import org.cuit.epoch.vo.ConditionVO;
 import org.cuit.epoch.vo.PasswordVO;
 import org.cuit.epoch.vo.UserVO;
 import org.cuit.epoch.vo.page.PageResult;
+import org.cuit.epoch.vo.strategy.login.QQLoginVO;
 import org.cuit.epoch.vo.strategy.login.WeiboLoginVO;
 
 import java.util.List;
@@ -59,13 +60,13 @@ public interface UserAuthService extends IService<UserAuth> {
      */
     void register(UserVO user);
 
-//    /**
-//     * qq登录
-//     *
-//     * @param qqLoginVO qq登录信息
-//     * @return 用户登录信息
-//     */
-//    UserInfoDTO qqLogin(QQLoginVO qqLoginVO);
+    /**
+     * qq登录
+     *
+     * @param qqLoginVO qq登录信息
+     * @return 用户登录信息
+     */
+    UserInfoDTO qqLogin(QQLoginVO qqLoginVO);
 
     /**
      * 微博登录

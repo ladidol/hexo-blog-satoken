@@ -11,18 +11,16 @@ import com.baomidou.mybatisplus.core.toolkit.StringUtils;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import eu.bitwalker.useragentutils.UserAgent;
 import lombok.extern.slf4j.Slf4j;
+import org.cuit.epoch.constant.CommonConst;
 import org.cuit.epoch.dto.*;
 import org.cuit.epoch.entity.UserAuth;
 import org.cuit.epoch.entity.UserInfo;
 import org.cuit.epoch.entity.UserRole;
-import org.cuit.epoch.constant.CommonConst;
-
 import org.cuit.epoch.enums.LoginTypeEnum;
 import org.cuit.epoch.enums.RoleEnum;
 import org.cuit.epoch.exception.AppException;
 import org.cuit.epoch.mapper.RoleMapper;
 import org.cuit.epoch.mapper.UserAuthMapper;
-
 import org.cuit.epoch.mapper.UserInfoMapper;
 import org.cuit.epoch.mapper.UserRoleMapper;
 import org.cuit.epoch.service.BlogInfoService;
@@ -36,6 +34,7 @@ import org.cuit.epoch.vo.ConditionVO;
 import org.cuit.epoch.vo.PasswordVO;
 import org.cuit.epoch.vo.UserVO;
 import org.cuit.epoch.vo.page.PageResult;
+import org.cuit.epoch.vo.strategy.login.QQLoginVO;
 import org.cuit.epoch.vo.strategy.login.WeiboLoginVO;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageProperties;
@@ -55,8 +54,7 @@ import java.util.stream.Collectors;
 import static org.cuit.epoch.constant.CommonConst.*;
 import static org.cuit.epoch.constant.MQPrefixConst.EMAIL_EXCHANGE;
 import static org.cuit.epoch.constant.RedisPrefixConst.*;
-import static org.cuit.epoch.constant.RedisPrefixConst.TALK_USER_LIKE;
-import static org.cuit.epoch.enums.UserAreaTypeEnum.*;
+import static org.cuit.epoch.enums.UserAreaTypeEnum.getUserAreaType;
 import static org.cuit.epoch.enums.ZoneEnum.SHANGHAI;
 import static org.cuit.epoch.util.CommonUtils.checkEmail;
 import static org.cuit.epoch.util.CommonUtils.getRandomCode;
@@ -284,12 +282,12 @@ public class UserAuthServiceImpl extends ServiceImpl<UserAuthMapper, UserAuth> i
         // 将验证码存入redis，设置过期时间为15分钟
         redisService.set(USER_CODE_KEY + username, code, CODE_EXPIRE_TIME);
     }
-//
-//    @Transactional(rollbackFor = Exception.class)
-//    @Override
-//    public UserInfoDTO qqLogin(QQLoginVO qqLoginVO) {
-//        return socialLoginStrategyContext.executeLoginStrategy(JSON.toJSONString(qqLoginVO), LoginTypeEnum.QQ);
-//    }
+
+    @Transactional(rollbackFor = AppException.class)
+    @Override
+    public UserInfoDTO qqLogin(QQLoginVO qqLoginVO) {
+        return socialLoginStrategyContext.executeLoginStrategy(JSON.toJSONString(qqLoginVO), LoginTypeEnum.QQ);
+    }
 
     @Transactional(rollbackFor = AppException.class)
     @Override

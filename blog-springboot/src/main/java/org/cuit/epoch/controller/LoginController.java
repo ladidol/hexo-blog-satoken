@@ -7,9 +7,13 @@ import org.cuit.epoch.dto.UserDetailDTO;
 import org.cuit.epoch.dto.UserInfoDTO;
 import org.cuit.epoch.service.UserAuthService;
 import org.cuit.epoch.util.Result;
+import org.cuit.epoch.vo.strategy.login.QQLoginVO;
 import org.cuit.epoch.vo.strategy.login.WeiboLoginVO;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
@@ -59,17 +63,17 @@ public class LoginController {
         return Result.ok(userAuthService.weiboLogin(weiBoLoginVO));
     }
 
-//    /**
-//     * qq登录
-//     *
-//     * @param qqLoginVO qq登录信息
-//     * @return {@link Result<UserInfoDTO>} 用户信息
-//     */
-//    @ApiOperation(value = "qq登录")
-//    @PostMapping("/users/oauth/qq")
-//    public Result<UserInfoDTO> qqLogin(@Valid @RequestBody QQLoginVO qqLoginVO) {
-//        return Result.ok(userAuthService.qqLogin(qqLoginVO));
-//    }
+    /**
+     * qq登录
+     *
+     * @param qqLoginVO qq登录信息
+     * @return {@link Result<UserInfoDTO>} 用户信息
+     */
+    @ApiOperation(value = "qq登录")
+    @PostMapping("/users/oauth/qq")
+    public Result<UserInfoDTO> qqLogin(@Valid @RequestBody QQLoginVO qqLoginVO) {
+        return Result.ok(userAuthService.qqLogin(qqLoginVO));
+    }
 
 
 }
