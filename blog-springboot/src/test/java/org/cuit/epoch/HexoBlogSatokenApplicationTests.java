@@ -37,7 +37,8 @@ class HexoBlogSatokenApplicationTests {
 
     @Test
     void getEncodePassword() {
-        System.out.println(PasswordUtils.encrypt("nihao123"));
+        System.out.println(PasswordUtils.encrypt("123456"));
+        System.out.println(PasswordUtils.match("123456","15f107e28bde201135268a000b071c16e379ffcd2441b9f567175a1ce6fdcc13"));
     }
 
 

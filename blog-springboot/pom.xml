@@ -138,8 +138,11 @@
             <version>0.2.0</version>
         </dependency>
 
-
-
+        <!--使用 Spring Boot Actuator 来对 Spring Boot 项目进行简单的监控。-->
+<!--        <dependency>-->
+<!--            <groupId>org.springframework.boot</groupId>-->
+<!--            <artifactId>spring-boot-starter-actuator</artifactId>-->
+<!--        </dependency>-->
 
 
 

@@ -50,7 +50,8 @@ public class OptLogAspect {
      * @param joinPoint 切入点
      * @param keys      返回结果
      */
-    @AfterReturning(value = "optLogPointCut()", returning = "keys")
+//    @AfterReturning(value = "optLogPointCut()", returning = "keys")
+    @AfterReturning(value = "org.cuit.epoch.aspect.OptLogAspect.optLogPointCut()",returning = "keys")
     @SuppressWarnings("unchecked")
     public void saveOptLog(JoinPoint joinPoint, Object keys) {
         // 获取RequestAttributes

@@ -254,7 +254,10 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, Article> impl
     @Override
     public void updateArticleTop(ArticleTopVO articleTopVO) {
         // 修改文章置顶状态
-        Article article = Article.builder().id(articleTopVO.getId()).isTop(articleTopVO.getIsTop()).build();
+        Article article = Article.builder()
+                .id(articleTopVO.getId())
+                .isTop(articleTopVO.getIsTop())
+                .build();
         articleDao.updateById(article);
     }
 

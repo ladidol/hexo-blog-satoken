@@ -28,7 +28,7 @@
 
 **后台链接：** [admin.ladidol.top](http://admin.ladidol.top)
 
-测试账号：test@qq.com，密码：1234567，可登入后台查看。
+测试账号：test@qq.com，密码：123456，可登入后台查看。
 
 **Github地址：**[ladidol/hexo-blog-satoken (github.com)](https://github.com/ladidol/hexo-blog-satoken)
 
