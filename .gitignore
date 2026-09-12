@@ -1,2 +1,5 @@
 /blog-springboot/target/
 /blog-springboot/src/main/docker/docker-ca/
+
+# Local configuration supplied for backend migration
+/blog-springboot/src/main/resources/application-prod.yml

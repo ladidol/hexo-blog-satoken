@@ -1,0 +1,8 @@
+/data/
+/bin/
+/.local-frontends/
+.env
+.env.*
+!.env.example
+*.log
+*.pid
