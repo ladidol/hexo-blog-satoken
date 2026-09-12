@@ -3,3 +3,6 @@
 
 # Local configuration supplied for backend migration
 /blog-springboot/src/main/resources/application-prod.yml
+
+
+/.idea/*
